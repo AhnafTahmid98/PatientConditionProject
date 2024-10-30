@@ -3,6 +3,7 @@ import board
 import busio
 from adafruit_ads1x15.analog_in import AnalogIn
 from adafruit_ads1x15.ads1115 import ADS1115
+from collections import deque
 
 # Initialize I2C bus and ADS1115 for heart rate sensor
 i2c = busio.I2C(board.SCL, board.SDA)
@@ -13,8 +14,13 @@ chan = AnalogIn(ads, 0)
 counter = 0
 temp = [0] * 21
 max_heartpulse_duty = 2000  # 2 seconds as the maximum allowed time between pulses
+min_heartpulse_duty = 300   # 300 ms minimum interval (200 BPM) to avoid false positives
 data_effect = True
 heart_rate = 0
+
+# Moving average filter parameters
+window_size = 5
+voltage_window = deque([0]*window_size, maxlen=window_size)
 
 def array_init():
     """Initialize the array for pulse timestamps."""
@@ -38,12 +44,14 @@ def check_pulse():
 
     # Read voltage from the sensor
     voltage = chan.voltage
+    voltage_window.append(voltage)
+    smoothed_voltage = sum(voltage_window) / window_size  # Smooth the signal
 
-    # Detect a pulse when voltage goes above threshold
-    if voltage > 2.0:  # Adjust threshold based on your sensor's baseline output
+    # Detect a pulse when smoothed voltage goes above threshold
+    if smoothed_voltage > 2.0:  # Adjust threshold based on sensor's baseline output
         current_time = int(time.time() * 1000)  # Current time in milliseconds
         temp[counter] = current_time
-        
+
         # Debugging output for tracking pulse intervals
         print(f"Pulse detected at index {counter}, Time: {temp[counter]} ms")
 
@@ -56,11 +64,11 @@ def check_pulse():
         print(f"Interval since last pulse: {sub} ms")
 
         # Check if the interval is within an acceptable range
-        if sub > max_heartpulse_duty:
+        if sub > max_heartpulse_duty or sub < min_heartpulse_duty:
             data_effect = False
             counter = 0
-            print("Heart rate measure error, restarting measurement.")
-            array_init()  # Re-initialize if pulse interval is too long
+            print("Heart rate measure error or noise detected, restarting measurement.")
+            array_init()  # Re-initialize if pulse interval is too long or too short
         elif counter == 20 and data_effect:
             counter = 0
             calculate_heart_rate()  # Calculate BPM after 20 pulses
