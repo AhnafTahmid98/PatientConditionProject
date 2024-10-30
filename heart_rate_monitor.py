@@ -1,13 +1,13 @@
 import time
 import board
 import busio
-from adafruit_ads1x15.ads1115 import ADS
+from adafruit_ads1x15.ads1115 import ADS1115  # Importing ADS1115 directly
 from adafruit_ads1x15.analog_in import AnalogIn
 
 # Set up I2C bus and ADS1115
 i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS(i2c)
-chan_A1 = AnalogIn(ads, ADS.P1)  # Using A1 as per your setup
+ads = ADS1115(i2c)
+chan_A1 = AnalogIn(ads, ADS1115.P1)  # Using A1 as per your setup
 
 # Constants
 MIN_VALID_INTERVAL = 300  # Minimum interval in ms for a valid pulse
