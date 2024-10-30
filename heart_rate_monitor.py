@@ -1,21 +1,21 @@
 import time
 import board
 import busio
-from adafruit_ads1x15.ads1115 import ADS1115  # Importing ADS1115 directly
+from adafruit_ads1x15.ads1115 import ADS
 from adafruit_ads1x15.analog_in import AnalogIn
 
-# Set up I2C bus and ADS1115
+# Initialize I2C bus and ADS1115
 i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS1115(i2c)
-chan_A1 = AnalogIn(ads, ADS1115.P1)  # Using A1 as per your setup
+ads = ADS(i2c)
+chan_A1 = AnalogIn(ads, ADS.P1)  # Use ADS.P1 for A1 connection
 
-# Constants
+# Constants for pulse detection
 MIN_VALID_INTERVAL = 300  # Minimum interval in ms for a valid pulse
 MAX_VALID_INTERVAL = 1500  # Maximum interval in ms for a valid pulse
 
 # Variables
 previous_pulse_time = None
-bpm_values = []
+pulse_intervals = []
 
 def calculate_bpm(intervals):
     """Calculate BPM based on the average of pulse intervals."""
@@ -26,8 +26,6 @@ def calculate_bpm(intervals):
     return None
 
 print("Starting heart rate measurement...")
-pulse_intervals = []
-
 try:
     while True:
         # Read the voltage on A1
@@ -63,7 +61,5 @@ try:
 
 except KeyboardInterrupt:
     print("Measurement stopped by user.")
-except ImportError as e:
-    print(f"Import error: {e}. Please check library installation.")
 finally:
     print("Exiting program gracefully.")
