@@ -7,12 +7,21 @@ import busio
 # Set up I2C and ADS1115
 i2c = busio.I2C(board.SCL, board.SDA)
 ads = ads1115.ADS1115(i2c)
-chan = AnalogIn(ads, ads1115.P1)  # Using A1
 
-print("Starting heart rate measurement...")
+# Set up channels
+chan_A0 = AnalogIn(ads, ads1115.P0)
+chan_A1 = AnalogIn(ads, ads1115.P1)
+chan_A2 = AnalogIn(ads, ads1115.P2)
+chan_A3 = AnalogIn(ads, ads1115.P3)
 
-# Heart rate measurement logic here
+print("Reading voltages on all channels...")
+
+# Loop to read and display voltages
 while True:
-    voltage = chan.voltage
-    print(f"Voltage on A1: {voltage:.3f} V")
-    time.sleep(0.5)
+    voltage_A0 = chan_A0.voltage
+    voltage_A1 = chan_A1.voltage
+    voltage_A2 = chan_A2.voltage
+    voltage_A3 = chan_A3.voltage
+    
+    print(f"Voltage on A0: {voltage_A0:.3f} V, A1: {voltage_A1:.3f} V, A2: {voltage_A2:.3f} V, A3: {voltage_A3:.3f} V")
+    time.sleep(1)
