@@ -12,7 +12,7 @@ ads = ADS1115(i2c)
 chan = AnalogIn(ads, 1)  # Use A1
 
 # Parameters for heartbeat detection
-threshold_voltage = 0.5  # Set threshold for detecting a pulse; may need to adjust based on sensor output
+threshold_voltage = 0.55  # Adjusted threshold for detecting a pulse
 pulse_intervals = []
 last_pulse_time = None
 
@@ -23,7 +23,7 @@ try:
         # Read the voltage from A1
         voltage = chan.voltage
         current_time = time.time() * 1000  # Current time in milliseconds
-        
+
         # Detect pulse based on threshold
         if voltage > threshold_voltage:
             if last_pulse_time is None:
@@ -33,7 +33,7 @@ try:
             else:
                 # Calculate interval since last pulse
                 interval = current_time - last_pulse_time
-                if 300 < interval < 2000:  # Ignore noise by setting limits for pulse interval (300ms to 2000ms)
+                if 300 < interval < 1500:  # Adjusted interval limits (300ms to 1500ms) for filtering
                     pulse_intervals.append(interval)
                     print(f"Pulse detected. Interval since last pulse: {interval:.2f} ms")
                     last_pulse_time = current_time
