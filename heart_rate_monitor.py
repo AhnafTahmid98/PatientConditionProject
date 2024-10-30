@@ -8,23 +8,52 @@ from adafruit_ads1x15.ads1115 import ADS1115
 i2c = busio.I2C(board.SCL, board.SDA)
 ads = ADS1115(i2c)
 
-# Set up channels A0, A1, A2, and A3 for testing
-chan_A0 = AnalogIn(ads, 0)  # A0
-chan_A1 = AnalogIn(ads, 1)  # A1
-chan_A2 = AnalogIn(ads, 2)  # A2
-chan_A3 = AnalogIn(ads, 3)  # A3
+# Set up the channel to read from A1
+chan = AnalogIn(ads, 1)  # Use A1
+
+# Parameters for heartbeat detection
+threshold_voltage = 0.5  # Set threshold for detecting a pulse; may need to adjust based on sensor output
+pulse_intervals = []
+last_pulse_time = None
+
+print("Starting heart rate measurement...")
 
 try:
-    print("Reading raw values from ADS1115 on A0, A1, A2, and A3...")
     while True:
-        # Read voltage from A0, A1, A2, and A3
-        voltage_A0 = chan_A0.voltage
-        voltage_A1 = chan_A1.voltage
-        voltage_A2 = chan_A2.voltage
-        voltage_A3 = chan_A3.voltage
-        print(f"Voltage on A0: {voltage_A0:.3f} V, A1: {voltage_A1:.3f} V, A2: {voltage_A2:.3f} V, A3: {voltage_A3:.3f} V")
+        # Read the voltage from A1
+        voltage = chan.voltage
+        current_time = time.time() * 1000  # Current time in milliseconds
         
-        time.sleep(0.5)  # Read every 0.5 seconds
+        # Detect pulse based on threshold
+        if voltage > threshold_voltage:
+            if last_pulse_time is None:
+                # First pulse detected
+                last_pulse_time = current_time
+                print("Pulse detected (first pulse)")
+            else:
+                # Calculate interval since last pulse
+                interval = current_time - last_pulse_time
+                if 300 < interval < 2000:  # Ignore noise by setting limits for pulse interval (300ms to 2000ms)
+                    pulse_intervals.append(interval)
+                    print(f"Pulse detected. Interval since last pulse: {interval:.2f} ms")
+                    last_pulse_time = current_time
+                else:
+                    # Detected noise or an abnormal interval
+                    print("Noise or abnormal pulse interval detected, skipping...")
+                    last_pulse_time = current_time
+
+            # Calculate BPM if we have at least 5 intervals
+            if len(pulse_intervals) >= 5:
+                avg_interval = sum(pulse_intervals) / len(pulse_intervals)
+                bpm = 60000 / avg_interval  # Convert average interval to BPM
+                print(f"Heart Rate: {bpm:.2f} BPM")
+                print(f"Your BPM is {bpm:.2f}")
+                
+                # Clear intervals for fresh calculation
+                pulse_intervals.clear()
+
+        # Wait a short time before reading again
+        time.sleep(0.05)  # Adjust sample rate if necessary
 
 except KeyboardInterrupt:
-    print("Stopped by user.")
+    print("Measurement stopped by user.")
