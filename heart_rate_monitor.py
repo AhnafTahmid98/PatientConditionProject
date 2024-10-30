@@ -1,31 +1,53 @@
 import time
-try:
-    from adafruit_ads1x15.ads1115 import ADS
-    from adafruit_ads1x15.analog_in import AnalogIn
-    import board
-    import busio
-    print("ADS and AnalogIn modules imported successfully!")
-except ImportError as e:
-    print(f"Import error: {e}")
-    exit()
+import board
+import busio
+from adafruit_ads1x15.ads1115 import ADS1115
+from adafruit_ads1x15.analog_in import AnalogIn
 
-# Initialize I2C bus and ADS1115
+# Initialize I2C bus and ADS1115 ADC
 i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS(i2c)
+ads = ADS1115(i2c)
 
-# Create an analog input channel on A1
-try:
-    chan = AnalogIn(ads, ADS.P1)
-    print("Analog channel on A1 initialized successfully!")
-except AttributeError as e:
-    print(f"Attribute error: {e}")
-    exit()
+# Select A1 as the input channel for heart rate measurement
+chan = AnalogIn(ads, ADS1115.P1)
 
-# Reading loop for testing
-print("Starting voltage readings on A1...")
+# Variables to measure BPM
+previous_pulse_time = None
+bpm_readings = []
+
+print("Starting heart rate measurement...")
+
 try:
     while True:
-        print(f"Voltage on A1: {chan.voltage:.3f} V")
-        time.sleep(1)
+        # Read the voltage value from the sensor
+        voltage = chan.voltage
+
+        # Threshold voltage for detecting a pulse (you may need to adjust this value)
+        threshold_voltage = 0.5
+
+        # Detect pulse if voltage crosses the threshold
+        if voltage > threshold_voltage:
+            current_pulse_time = time.time() * 1000  # in milliseconds
+
+            if previous_pulse_time:
+                interval = current_pulse_time - previous_pulse_time
+                bpm = 60000 / interval  # Calculate BPM from interval (ms to minutes)
+                bpm_readings.append(bpm)
+
+                # Keep the list of readings to last 5 only
+                if len(bpm_readings) > 5:
+                    bpm_readings.pop(0)
+
+                # Calculate average BPM
+                avg_bpm = sum(bpm_readings) / len(bpm_readings)
+                
+                print(f"Pulse detected. Interval since last pulse: {interval:.2f} ms")
+                print(f"Heart Rate: {avg_bpm:.2f} BPM")
+                print(f"Your BPM is {avg_bpm:.2f}")
+
+            previous_pulse_time = current_pulse_time
+
+        time.sleep(0.05)  # Slight delay for smoother readings
+
 except KeyboardInterrupt:
     print("Measurement stopped by user.")
