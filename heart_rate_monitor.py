@@ -1,15 +1,15 @@
 import time
 import board
 import busio
-from adafruit_ads1x15.ads1115 import ADS1115
+from adafruit_ads1x15.ads import ADS  # Import ADS class instead of ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
 
 # Initialize I2C bus and ADS1115 ADC
 i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS1115(i2c)
+ads = ADS.ADS1115(i2c)  # Initialize ADS1115 object
 
 # Select A1 as the input channel for heart rate measurement
-chan = AnalogIn(ads, ADS1115.P1)
+chan = AnalogIn(ads, ADS.P1)  # Use ADS.P1 instead of ADS1115.P1
 
 # Variables to measure BPM
 previous_pulse_time = None
