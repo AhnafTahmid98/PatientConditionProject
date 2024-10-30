@@ -9,8 +9,9 @@ i2c = busio.I2C(board.SCL, board.SDA)
 ads = ADS1115(i2c)
 
 # Set up channels A0 and A1 for testing
-chan_A0 = AnalogIn(ads, ADS1115.P0)
-chan_A1 = AnalogIn(ads, ADS1115.P1)
+chan_A0 = AnalogIn(ads, 0)  # A0
+chan_A1 = AnalogIn(ads, 1)  # A1
+
 
 try:
     print("Reading raw values from ADS1115 on A0 and A1...")
