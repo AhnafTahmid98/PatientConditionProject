@@ -2,15 +2,15 @@ import time
 import board
 import busio
 from adafruit_ads1x15.analog_in import AnalogIn
-from adafruit_ads1x15.ads1115 import ADS
+from adafruit_ads1x15.ads1115 import ADS1115
 
 # Initialize I2C bus and ADS1115
 i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS(i2c)
+ads = ADS1115(i2c)
 
 # Set up channels A0 and A1 for testing
-chan_A0 = AnalogIn(ads, ADS.P0)
-chan_A1 = AnalogIn(ads, ADS.P1)
+chan_A0 = AnalogIn(ads, ADS1115.P0)
+chan_A1 = AnalogIn(ads, ADS1115.P1)
 
 try:
     print("Reading raw values from ADS1115 on A0 and A1...")
