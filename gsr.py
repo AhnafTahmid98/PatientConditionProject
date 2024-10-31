@@ -33,7 +33,7 @@ elevated_threshold = baseline_value * 1.3
 
 # Load Times New Roman or a similar font
 font_path = "/usr/share/fonts/truetype/msttcorefonts/times.ttf"  # Adjust path if needed
-font = ImageFont.truetype(font_path, 16)  # Adjust font size as needed
+font = ImageFont.truetype(font_path, 20)  # Adjust font size as needed
 
 def read_gsr():
     # Read the analog value from channel 1 (A1)
