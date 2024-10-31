@@ -1,4 +1,3 @@
-
 import time
 import board
 import busio
@@ -20,8 +19,8 @@ except IOError:
     font = ImageFont.load_default()
 
 # Thresholds and settings for heart rate and GSR
-heart_rate_channel = AnalogIn(ads, 0)
-gsr_channel = AnalogIn(ads, 1)
+heart_rate_channel = AnalogIn(ads, 2)  # Changed to A2 for heart rate
+gsr_channel = AnalogIn(ads, 1)         # GSR remains on A1
 high_threshold = 2.0  # Adjusted high threshold
 low_threshold = 1.0   # Adjusted low threshold
 min_pulse_interval = 0.3  # Minimum interval between pulses (in seconds)
