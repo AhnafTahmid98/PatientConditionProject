@@ -75,8 +75,11 @@ fig = plt.figure()
 
 # Start real-time animation and keep reference to prevent garbage collection
 start_time = time.time()
-global ani  # Make `ani` a global variable to keep it in memory
-ani = FuncAnimation(fig, animate, interval=1000, cache_frame_data=False)
+global ani
+ani = FuncAnimation(fig, animate, interval=1000, cache_frame_data=False, repeat=False)  # Avoid repeat to limit caching
 
 # Display the plot
 plt.show()
+
+# Ensure ani is kept in memory
+print("Animation started:", ani)
