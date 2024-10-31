@@ -3,19 +3,23 @@ import board
 import busio
 from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_ads1x15.ads1115 as ADS
+from collections import deque
 
 # Setup I2C bus and ADS1115 ADC
 i2c = busio.I2C(board.SCL, board.SDA)
 ads = ADS.ADS1115(i2c)
 
-# Set up A0 channel for the heartbeat sensor by directly using 0 for A0
+# Set up A0 channel for the heartbeat sensor
 chan = AnalogIn(ads, 0)  # Reading from A0 channel
 
 # Constants and variables for BPM calculation
-pulse_threshold = 2.5  # Increased threshold for clearer pulse detection
+pulse_threshold = 3.0  # Adjusted threshold based on observed readings
 pulse_intervals = []
 last_pulse_time = None
 bpm = 0
+
+# For smoothing voltage readings
+voltage_window = deque(maxlen=5)  # 5-sample moving average window
 
 def calculate_bpm():
     """Calculates BPM based on the recorded pulse intervals."""
@@ -27,11 +31,17 @@ def calculate_bpm():
         print(f"Heart Rate: {bpm:.2f} BPM")
         print(f"Your BPM is {bpm:.2f}")
 
+def smooth_voltage(voltage):
+    """Applies a moving average to smooth the voltage readings."""
+    voltage_window.append(voltage)
+    return sum(voltage_window) / len(voltage_window)
+
 # Main loop for measuring heart rate
 print("Starting heart rate measurement on A0...")
 
 while True:
-    voltage = chan.voltage
+    raw_voltage = chan.voltage
+    voltage = smooth_voltage(raw_voltage)
     print(f"Voltage on A0: {voltage:.3f} V")
 
     # Check for a pulse based on threshold crossing
@@ -46,7 +56,7 @@ while True:
             last_pulse_time = current_time
 
             # Only record intervals that are within a reasonable range
-            if 300 < interval < 2500:  # Adjusted range for possible pulse intervals
+            if 300 < interval < 1500:  # Adjusted range for possible pulse intervals
                 print(f"Pulse detected. Interval since last pulse: {interval:.2f} ms")
                 pulse_intervals.append(interval)
                 if len(pulse_intervals) > 5:
