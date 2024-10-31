@@ -12,7 +12,7 @@ ads = ADS.ADS1115(i2c)
 chan = AnalogIn(ads, 0)  # Reading from A0 channel
 
 # Constants and variables for BPM calculation
-pulse_threshold = 1.0  # Adjusted threshold voltage for detecting pulse peaks
+pulse_threshold = 2.5  # Increased threshold for clearer pulse detection
 pulse_intervals = []
 last_pulse_time = None
 bpm = 0
