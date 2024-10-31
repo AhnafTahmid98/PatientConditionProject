@@ -8,9 +8,10 @@ from luma.oled.device import ssd1306
 from luma.core.render import canvas
 from PIL import ImageFont
 
-# Initialize the I2C bus and devices
+# Initialize the I2C bus and devices with a short delay for stability
 def initialize_devices():
     i2c_ads = busio.I2C(board.SCL, board.SDA)
+    time.sleep(0.5)  # Short delay to stabilize the I2C bus
     adc = ADS1115(i2c_ads)
     adc.gain = 1
     i2c_display = i2c(port=1, address=0x3C)  # Confirm address with i2cdetect if needed
@@ -64,7 +65,7 @@ def determine_stress_level(smoothed_value):
 def display_stress_level(device, stress_level):
     # Display the stress level on the OLED screen with Times New Roman font
     with canvas(device) as draw:
-        draw.text((10, 10), "Stress:", font=font, fill="white")
+        draw.text((10, 10), "Stress Level:", font=font, fill="white")
         draw.text((10, 30), stress_level, font=font, fill="white")
 
 try:
@@ -77,7 +78,7 @@ try:
             if smoothed_value < 13000:
                 contact_status = "Contact with human detected"
                 stress_level = determine_stress_level(smoothed_value)
-                print(f"{contact_status} | Stress: {stress_level} | Smoothed GSR Value: {smoothed_value}")
+                print(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
                 
                 # Display the stress level on OLED
                 display_stress_level(device, stress_level)
@@ -86,7 +87,7 @@ try:
                 display_stress_level(device, "No Contact")
             
             # Delay for a bit to observe changes over time
-            time.sleep(2)  # Increase delay to reduce I2C load
+            time.sleep(3)  # Increase delay to reduce I2C load
 
         except OSError as e:
             print("I2C communication error detected. Reinitializing I2C bus...")
