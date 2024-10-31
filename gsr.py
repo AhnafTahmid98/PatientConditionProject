@@ -31,7 +31,7 @@ normal_threshold = baseline_value * 1.1
 elevated_threshold = baseline_value * 1.3
 
 # Load a larger font
-font_path = "usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+font_path = "/usr/share/fonts/truetype/msttcorefonts/times.ttf"
 font = ImageFont.truetype(font_path, 16)  # Adjust font size as needed
 
 def read_gsr():
