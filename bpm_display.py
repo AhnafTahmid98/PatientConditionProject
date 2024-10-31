@@ -24,18 +24,19 @@ first_pulse = True
 bpm_data = []
 time_data = []
 
-# Initialize plot
-plt.ion()  # Enable interactive mode for live updating
-fig, ax = plt.subplots()
-start_time = time.time()
-
 print("Starting heart rate measurement on A0...")
 
 # Function to update OLED display with BPM
 def update_oled(bpm):
     oled.fill(0)
+    # Specify the path to the font file
     oled.text(f"BPM: {int(bpm)}", 0, 0, 1)
     oled.show()
+
+# Initialize plot
+plt.ion()  # Enable interactive mode for live updating
+fig, ax = plt.subplots()
+start_time = time.time()
 
 # Main loop for pulse detection and live plot updating
 try:
