@@ -7,10 +7,10 @@ import busio
 # Setup I2C communication and initialize the ADS1115 ADC
 i2c = busio.I2C(board.SCL, board.SDA)
 ads = ADS1115(i2c)
-chan = AnalogIn(ads, 0)  # Use 0 directly for channel A0
+chan = AnalogIn(ads, 0)  # Using channel A0 directly
 
 # Variables for pulse detection
-high_threshold = 2.5  # Example voltage threshold for pulse detection
+high_threshold = 2.5  # Example threshold values
 low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
