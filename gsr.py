@@ -3,11 +3,19 @@ import board
 import busio
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
+from luma.core.interface.serial import i2c
+from luma.oled.device import ssd1306
+from luma.core.render import canvas
+from PIL import ImageFont
 
-# Set up I2C and ADS1115
-i2c = busio.I2C(board.SCL, board.SDA)
-adc = ADS1115(i2c)
+# Set up I2C for ADS1115 and OLED
+i2c_ads = busio.I2C(board.SCL, board.SDA)
+adc = ADS1115(i2c_ads)
 adc.gain = 1  # Set gain for ADC
+
+# Initialize the OLED display
+i2c_display = i2c(port=1, address=0x3C)  # Confirm address with i2cdetect
+device = ssd1306(i2c_display)
 
 # Moving average filter settings
 window_size = 10  # Number of readings to average
@@ -46,18 +54,28 @@ def determine_stress_level(smoothed_value):
     else:
         return "High"
 
+def display_stress_level(stress_level):
+    # Display the stress level on the OLED screen
+    with canvas(device) as draw:
+        draw.text((10, 10), "Stress Level:", fill="white")
+        draw.text((10, 30), f"{stress_level}", fill="white")
+
 try:
     while True:
         gsr_value = read_gsr()
         smoothed_value = get_moving_average(gsr_value)
         
-        # Determine contact status
+        # Determine contact status and stress level
         if smoothed_value < 13000:
             contact_status = "Contact with human detected"
             stress_level = determine_stress_level(smoothed_value)
             print(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
+            
+            # Display the stress level on OLED
+            display_stress_level(stress_level)
         else:
             print("No contact detected")
+            display_stress_level("No Contact")
         
         # Delay for a bit to observe changes over time
         time.sleep(1)
