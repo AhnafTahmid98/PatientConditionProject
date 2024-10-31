@@ -1,14 +1,18 @@
 import time
-from Adafruit_ADS1x15 import ADS1115
+import board
+import busio
+from adafruit_ads1x15.ads1115 import ADS1115
+from adafruit_ads1x15.analog_in import AnalogIn
 
-# Initialize the ADS1115 (ADC)
-adc = ADS1115()
-GAIN = 1  # Gain setting for ADS1115
+# Set up I2C and ADS1115
+i2c = busio.I2C(board.SCL, board.SDA)
+adc = ADS1115(i2c)
+adc.gain = 1  # Set gain for ADC
 
 def read_gsr():
     # Read the analog value from channel 1 (A1)
-    value = adc.read_adc(1, gain=GAIN)
-    return value
+    chan = AnalogIn(adc, 1)
+    return chan.value
 
 try:
     while True:
