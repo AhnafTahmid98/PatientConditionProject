@@ -30,6 +30,10 @@ relaxed_threshold = baseline_value * 0.9
 normal_threshold = baseline_value * 1.1
 elevated_threshold = baseline_value * 1.3
 
+# Load a larger font
+font_path = "/path/to/your/font/DejaVuSans.ttf"  # Replace with the actual path to your font file
+font = ImageFont.truetype(font_path, 16)  # Adjust font size as needed
+
 def read_gsr():
     # Read the analog value from channel 1 (A1)
     chan = AnalogIn(adc, 1)
@@ -58,10 +62,10 @@ def determine_stress_level(smoothed_value):
         return "High"
 
 def display_stress_level(device, stress_level):
-    # Display the stress level on the OLED screen
+    # Display the stress level on the OLED screen with larger font
     with canvas(device) as draw:
-        draw.text((10, 10), "Stress Level:", fill="white")
-        draw.text((10, 30), f"{stress_level}", fill="white")
+        draw.text((10, 10), "Stress Level:", font=font, fill="white")
+        draw.text((10, 30), stress_level, font=font, fill="white")
 
 try:
     while True:
@@ -73,7 +77,7 @@ try:
             if smoothed_value < 13000:
                 contact_status = "Contact with human detected"
                 stress_level = determine_stress_level(smoothed_value)
-                print(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
+                print(f"{contact_status} | Stress: {stress_level} | Smoothed GSR Value: {smoothed_value}")
                 
                 # Display the stress level on OLED
                 display_stress_level(device, stress_level)
