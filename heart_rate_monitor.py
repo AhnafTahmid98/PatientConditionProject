@@ -1,16 +1,15 @@
 import time
 import board
 import busio
-from adafruit_ads1x15.ads1115 import ADS
 from adafruit_ads1x15.analog_in import AnalogIn
-import adafruit_ads1x15.ads1115 as ADS1115
+import adafruit_ads1x15.ads1115 as ADS
 
 # Setup I2C bus and ADS1115 ADC
 i2c = busio.I2C(board.SCL, board.SDA)
-ads = ADS(i2c)
+ads = ADS.ADS1115(i2c)
 
-# Set up A0 channel for the heartbeat sensor
-chan = AnalogIn(ads, ADS.P0)  # Reading from A0 now
+# Set up A0 channel for the heartbeat sensor by directly using 0 for A0
+chan = AnalogIn(ads, 0)  # Reading from A0 channel
 
 # Constants and variables for BPM calculation
 pulse_threshold = 0.5  # Threshold voltage for detecting pulse peaks
