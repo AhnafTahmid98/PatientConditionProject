@@ -9,12 +9,12 @@ i2c = busio.I2C(board.SCL, board.SDA)
 ads = ADS1115(i2c)
 ads.gain = 1  # Gain of 1 for a range of 4.096V
 
-# Initialize channels A0, A1, A2, and A3 on ADS1115
+# Initialize channels using numeric indexing 0, 1, 2, and 3
 channels = [
-    AnalogIn(ads, ADS1115.P0),  # A0
-    AnalogIn(ads, ADS1115.P1),  # A1
-    AnalogIn(ads, ADS1115.P2),  # A2
-    AnalogIn(ads, ADS1115.P3)   # A3
+    AnalogIn(ads, 0),  # A0
+    AnalogIn(ads, 1),  # A1
+    AnalogIn(ads, 2),  # A2
+    AnalogIn(ads, 3)   # A3
 ]
 
 print("Reading from ADS1115 on channels A0, A1, A2, and A3...")
