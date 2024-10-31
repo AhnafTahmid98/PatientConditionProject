@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_ssd1306
+from PIL import Image, ImageDraw, ImageFont
 
 # Setup I2C communication for OLED display and ADS1115 ADC
 i2c = busio.I2C(board.SCL, board.SDA)
@@ -15,6 +16,12 @@ chan = AnalogIn(ads, 0)  # Using channel A0 for heart rate sensor
 oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
 oled.fill(0)
 oled.show()
+
+# Load a larger font for better readability
+try:
+    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)  # 16-point font
+except IOError:
+    font = ImageFont.load_default()
 
 # Variables for pulse detection and data storage
 high_threshold = 2.5
@@ -28,9 +35,15 @@ print("Starting heart rate measurement on A0...")
 
 # Function to update OLED display with BPM
 def update_oled(bpm):
-    oled.fill(0)
-    # Specify the path to the font file
-    oled.text(f"BPM: {int(bpm)}", 0, 0, 1)
+    # Create a blank image for the OLED display
+    image = Image.new("1", (oled.width, oled.height))
+    draw = ImageDraw.Draw(image)
+
+    # Draw the BPM text using the larger font
+    draw.text((0, 0), f"BPM: {int(bpm)}", font=font, fill=255)
+    
+    # Display image on OLED
+    oled.image(image)
     oled.show()
 
 # Initialize plot
