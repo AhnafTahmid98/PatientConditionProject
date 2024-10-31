@@ -22,12 +22,14 @@ except IOError:
 # Thresholds and settings for heart rate and GSR
 heart_rate_channel = AnalogIn(ads, 0)
 gsr_channel = AnalogIn(ads, 1)
-high_threshold = 2.5
-low_threshold = 1.5
+high_threshold = 2.0  # Adjusted high threshold
+low_threshold = 1.0   # Adjusted low threshold
+min_pulse_interval = 0.3  # Minimum interval between pulses (in seconds)
 last_pulse_time = 0
 first_pulse = True
 window_size = 10
-readings = []
+hr_readings = []  # For smoothing heart rate data
+gsr_readings = []
 baseline_value = 11000
 relaxed_threshold = baseline_value * 0.9
 normal_threshold = baseline_value * 1.1
@@ -43,8 +45,8 @@ def update_oled(bpm, stress_level):
     oled.image(image)
     oled.show()
 
-# Function to calculate moving average for GSR sensor
-def get_moving_average(value):
+# Function to calculate moving average
+def get_moving_average(value, readings):
     readings.append(value)
     if len(readings) > window_size:
         readings.pop(0)
@@ -64,27 +66,30 @@ def determine_stress_level(smoothed_value):
 # Main loop to read heart rate and GSR, and update OLED
 try:
     while True:
-        # Read heart rate sensor data and calculate BPM
+        # Read and smooth heart rate sensor data
         voltage = heart_rate_channel.voltage
+        smoothed_voltage = get_moving_average(voltage, hr_readings)
+
+        # Detect pulse and calculate BPM
         bpm = None
-        if voltage > high_threshold and first_pulse:
+        if smoothed_voltage > high_threshold and first_pulse:
             last_pulse_time = time.time()
             first_pulse = False
-        elif voltage > high_threshold and time.time() - last_pulse_time > 0.4:
-            pulse_interval = (time.time() - last_pulse_time) * 1000
+        elif smoothed_voltage > high_threshold and (time.time() - last_pulse_time) > min_pulse_interval:
+            pulse_interval = (time.time() - last_pulse_time) * 1000  # in ms
             last_pulse_time = time.time()
             bpm = 60000 / pulse_interval
 
-        # Read GSR sensor data and calculate stress level
+        # Read and smooth GSR sensor data, then determine stress level
         gsr_value = gsr_channel.value
-        smoothed_value = get_moving_average(gsr_value)
-        stress_level = determine_stress_level(smoothed_value)
+        smoothed_gsr_value = get_moving_average(gsr_value, gsr_readings)
+        stress_level = determine_stress_level(smoothed_gsr_value)
 
         # Update OLED display
         update_oled(bpm if bpm else 0, stress_level)
 
         # Print data for debugging
-        print(f"BPM: {bpm if bpm else 'Calculating...'}, Stress: {stress_level}, GSR Value: {smoothed_value}")
+        print(f"BPM: {bpm if bpm else 'Calculating...'}, Stress: {stress_level}, GSR Value: {smoothed_gsr_value}")
 
         # Delay for observation
         time.sleep(1)
