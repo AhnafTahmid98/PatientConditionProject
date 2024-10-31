@@ -6,8 +6,8 @@ adc = ADS1115()
 GAIN = 1  # Gain setting for ADS1115
 
 def read_gsr():
-    # Read the analog value from channel 0 (SIG connected here)
-    value = adc.read_adc(0, gain=GAIN)
+    # Read the analog value from channel 1 (A1)
+    value = adc.read_adc(1, gain=GAIN)
     return value
 
 try:
@@ -15,7 +15,7 @@ try:
         gsr_value = read_gsr()
         print("GSR Value:", gsr_value)
         
-        # Delay for a bit
+        # Delay for a bit to observe changes over time
         time.sleep(1)
 
 except KeyboardInterrupt:
