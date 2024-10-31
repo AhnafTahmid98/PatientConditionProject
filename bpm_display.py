@@ -75,7 +75,7 @@ fig = plt.figure()
 
 # Start real-time animation
 start_time = time.time()
-ani = FuncAnimation(fig, animate, interval=1000)
+ani = FuncAnimation(fig, animate, interval=1000, cache_frame_data=False)  # Avoid caching frame data
 
-# Display plot
+# Keep a reference to ani to prevent deletion
 plt.show()
