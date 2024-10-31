@@ -73,9 +73,10 @@ def animate(i):
 plt.style.use("ggplot")
 fig = plt.figure()
 
-# Start real-time animation
+# Start real-time animation and keep reference to prevent garbage collection
 start_time = time.time()
-ani = FuncAnimation(fig, animate, interval=1000, cache_frame_data=False)  # Avoid caching frame data
+global ani  # Make `ani` a global variable to keep it in memory
+ani = FuncAnimation(fig, animate, interval=1000, cache_frame_data=False)
 
-# Keep a reference to ani to prevent deletion
+# Display the plot
 plt.show()
