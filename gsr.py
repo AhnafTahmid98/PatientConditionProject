@@ -13,7 +13,7 @@ def initialize_devices():
     i2c_ads = busio.I2C(board.SCL, board.SDA)
     adc = ADS1115(i2c_ads)
     adc.gain = 1
-    i2c_display = i2c(port=1, address=0x3C)
+    i2c_display = i2c(port=1, address=0x3C)  # Confirm address with i2cdetect if needed
     device = ssd1306(i2c_display)
     return adc, device
 
@@ -30,8 +30,8 @@ relaxed_threshold = baseline_value * 0.9
 normal_threshold = baseline_value * 1.1
 elevated_threshold = baseline_value * 1.3
 
-# Load a larger font
-font_path = "/usr/share/fonts/truetype/msttcorefonts/times.ttf"
+# Load Times New Roman or a similar font
+font_path = "/usr/share/fonts/truetype/msttcorefonts/times.ttf"  # Adjust path if needed
 font = ImageFont.truetype(font_path, 16)  # Adjust font size as needed
 
 def read_gsr():
@@ -62,10 +62,10 @@ def determine_stress_level(smoothed_value):
         return "High"
 
 def display_stress_level(device, stress_level):
-    # Display the stress level on the OLED screen with larger font
+    # Display the stress level on the OLED screen with Times New Roman font
     with canvas(device) as draw:
-        draw.text((10, 10), "Stress:", font=font, fill="yellow")
-        draw.text((10, 30), stress_level, font=font, fill="yellow")
+        draw.text((10, 10), "Stress:", font=font, fill="white")
+        draw.text((10, 30), stress_level, font=font, fill="white")
 
 try:
     while True:
