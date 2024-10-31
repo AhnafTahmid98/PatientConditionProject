@@ -8,7 +8,7 @@ import statistics
 # Setup for I2C communication and ADS1115
 i2c = busio.I2C(board.SCL, board.SDA)
 ads = ADS(i2c)
-chan = AnalogIn(ads, ADS.P0)  # Using channel A0
+chan = AnalogIn(ads, 0)  # Using channel A0 directly as 0
 
 # Parameters for adaptive thresholding and pulse calculation
 window_size = 10  # Number of samples for adaptive threshold
