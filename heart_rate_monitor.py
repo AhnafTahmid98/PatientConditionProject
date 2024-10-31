@@ -12,7 +12,7 @@ ads = ADS.ADS1115(i2c)
 chan = AnalogIn(ads, 0)  # Reading from A0 channel
 
 # Constants and variables for BPM calculation
-pulse_threshold = 0.5  # Threshold voltage for detecting pulse peaks
+pulse_threshold = 1.0  # Adjusted threshold voltage for detecting pulse peaks
 pulse_intervals = []
 last_pulse_time = None
 bpm = 0
@@ -46,7 +46,7 @@ while True:
             last_pulse_time = current_time
 
             # Only record intervals that are within a reasonable range
-            if 300 < interval < 2000:  # 300 ms < interval < 2000 ms
+            if 300 < interval < 2500:  # Adjusted range for possible pulse intervals
                 print(f"Pulse detected. Interval since last pulse: {interval:.2f} ms")
                 pulse_intervals.append(interval)
                 if len(pulse_intervals) > 5:
