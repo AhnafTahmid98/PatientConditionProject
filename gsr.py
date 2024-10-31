@@ -64,8 +64,8 @@ def determine_stress_level(smoothed_value):
 def display_stress_level(device, stress_level):
     # Display the stress level on the OLED screen with larger font
     with canvas(device) as draw:
-        draw.text((10, 10), "Stress Level:", font=font, fill="white")
-        draw.text((10, 30), stress_level, font=font, fill="white")
+        draw.text((10, 10), "Stress:", font=font, fill="yellow")
+        draw.text((10, 30), stress_level, font=font, fill="yellow")
 
 try:
     while True:
