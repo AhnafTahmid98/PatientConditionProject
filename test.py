@@ -2,9 +2,11 @@ import time
 import board
 import busio
 import threading
-import adafruit_mlx90614
+import asyncio
+import websockets
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
+import adafruit_mlx90614
 
 # Initialize the I2C bus and devices with a short delay for stability
 def initialize_ads():
@@ -69,74 +71,64 @@ low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
 
-def monitor_heart_rate():
+async def monitor_heart_rate(websocket):
     global last_pulse_time, first_pulse
     while True:
         try:
             # Read heart rate data
             voltage = chan_hr.voltage
-            print(f"Voltage on A0: {voltage:.3f} V")
-
             if voltage > high_threshold and first_pulse:
-                print("Pulse detected (first pulse)")
                 last_pulse_time = time.time()
                 first_pulse = False
-
             elif voltage > high_threshold and time.time() - last_pulse_time > 0.4:
                 pulse_interval = (time.time() - last_pulse_time) * 1000  # in ms
                 last_pulse_time = time.time()
                 bpm = 60000 / pulse_interval
-                print(f"Pulse detected. Interval: {pulse_interval:.2f} ms")
-                print(f"Heart Rate: {bpm:.2f} BPM")
-
+                await websocket.send(f"Heart Rate: {bpm:.2f} BPM")
             time.sleep(0.1)
         except Exception as e:
-            print(f"Heart rate monitoring error: {e}")
+            await websocket.send(f"Heart rate monitoring error: {e}")
 
-def monitor_temperature():
+async def monitor_temperature(websocket):
     while True:
         try:
-            # Only read temperature if contact is detected by GSR
             if readings and readings[-1] < contact_detection_threshold:
                 ambient_temp = mlx.ambient_temperature
                 object_temp = mlx.object_temperature
-                print(f"Ambient Temperature: {ambient_temp:.2f}°C")
-                print(f"Object Temperature: {object_temp:.2f}°C")
+                await websocket.send(f"Ambient Temperature: {ambient_temp:.2f}°C")
+                await websocket.send(f"Object Temperature: {object_temp:.2f}°C")
             else:
-                print("No human contact detected (temperature)")
-            
+                await websocket.send("No human contact detected (temperature)")
             time.sleep(3)
         except Exception as e:
-            print(f"Temperature monitoring error: {e}")
+            await websocket.send(f"Temperature monitoring error: {e}")
 
-def monitor_gsr():
+async def monitor_gsr(websocket):
     while True:
         try:
             gsr_value = read_gsr()
             smoothed_value = get_moving_average(gsr_value)
-
-            # Check for human contact before processing other sensor data
             if smoothed_value < contact_detection_threshold:
                 contact_status = "Contact with human detected"
                 stress_level = determine_stress_level(smoothed_value)
-                print(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
+                await websocket.send(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
             else:
-                print("No human contact detected (GSR)")
-            
+                await websocket.send("No human contact detected (GSR)")
             time.sleep(3)
         except Exception as e:
-            print(f"GSR monitoring error: {e}")
+            await websocket.send(f"GSR monitoring error: {e}")
 
-# Create and start threads for simultaneous monitoring
-heart_rate_thread = threading.Thread(target=monitor_heart_rate)
-temperature_thread = threading.Thread(target=monitor_temperature)
-gsr_thread = threading.Thread(target=monitor_gsr)
+async def handler(websocket, path):
+    # Run the monitoring functions in parallel using asyncio.gather
+    await asyncio.gather(
+        monitor_heart_rate(websocket),
+        monitor_temperature(websocket),
+        monitor_gsr(websocket)
+    )
 
-heart_rate_thread.start()
-temperature_thread.start()
-gsr_thread.start()
+# Start the WebSocket server
+start_server = websockets.serve(handler, "0.0.0.0", 8765)
 
-# Join threads to keep the main program running
-heart_rate_thread.join()
-temperature_thread.join()
-gsr_thread.join()
+# Run the server
+asyncio.get_event_loop().run_until_complete(start_server)
+asyncio.get_event_loop().run_forever()
