@@ -3,10 +3,6 @@ import board
 import busio
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
-from luma.core.interface.serial import i2c
-from luma.oled.device import ssd1306
-from luma.core.render import canvas
-from PIL import ImageFont
 
 # Initialize the I2C bus and devices with a short delay for stability
 def initialize_devices():
@@ -14,12 +10,10 @@ def initialize_devices():
     time.sleep(0.5)  # Short delay to stabilize the I2C bus
     adc = ADS1115(i2c_ads)
     adc.gain = 1
-    i2c_display = i2c(port=1, address=0x3C)  # Confirm address with i2cdetect if needed
-    device = ssd1306(i2c_display)
-    return adc, device
+    return adc
 
 # Set up initial I2C devices
-adc, device = initialize_devices()
+adc = initialize_devices()
 
 # Moving average filter settings
 window_size = 10  # Number of readings to average
@@ -30,10 +24,6 @@ baseline_value = 11000
 relaxed_threshold = baseline_value * 0.9
 normal_threshold = baseline_value * 1.1
 elevated_threshold = baseline_value * 1.3
-
-# Load Times New Roman or a similar font
-font_path = "/usr/share/fonts/truetype/msttcorefonts/times.ttf"  # Adjust path if needed
-font = ImageFont.truetype(font_path, 20)  # Adjust font size as needed
 
 def read_gsr():
     # Read the analog value from channel 1 (A1)
@@ -62,12 +52,6 @@ def determine_stress_level(smoothed_value):
     else:
         return "High"
 
-def display_stress_level(device, stress_level):
-    # Display the stress level on the OLED screen with Times New Roman font
-    with canvas(device) as draw:
-        draw.text((10, 10), "Stress Level:", font=font, fill="white")
-        draw.text((10, 30), stress_level, font=font, fill="white")
-
 try:
     while True:
         try:
@@ -79,19 +63,15 @@ try:
                 contact_status = "Contact with human detected"
                 stress_level = determine_stress_level(smoothed_value)
                 print(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
-                
-                # Display the stress level on OLED
-                display_stress_level(device, stress_level)
             else:
                 print("No contact detected")
-                display_stress_level(device, "No Contact")
             
             # Delay for a bit to observe changes over time
             time.sleep(3)  # Increase delay to reduce I2C load
 
         except OSError as e:
             print("I2C communication error detected. Reinitializing I2C bus...")
-            adc, device = initialize_devices()  # Reinitialize the I2C devices
+            adc = initialize_devices()  # Reinitialize the I2C device
 
 except KeyboardInterrupt:
     print("Program stopped.")
