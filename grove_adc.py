@@ -1,4 +1,4 @@
-import smbus
+from smbus2 import SMBus
 import time
 
 # I2C address of the ADS1115
@@ -14,7 +14,7 @@ FSR = 2.048
 MAX_ADC_VALUE = 32767
 
 # Initialize I2C (SMBus)
-bus = smbus.SMBus(1)
+bus = SMBus(1)
 
 # Function to configure and read a specific channel
 def read_adc_channel(channel):
@@ -52,10 +52,11 @@ def adc_to_voltage(adc_value):
     return voltage
 
 # Read and print the voltage of each channel
-for channel in range(4):
-    raw_value = read_adc_channel(channel)
-    voltage = adc_to_voltage(raw_value)
-    print(f"Channel {channel} voltage: {voltage:.4f} V")
-
-# Close the I2C connection if necessary
-bus.close()
+try:
+    for channel in range(4):
+        raw_value = read_adc_channel(channel)
+        voltage = adc_to_voltage(raw_value)
+        print(f"Channel {channel} voltage: {voltage:.4f} V")
+finally:
+    # Close the I2C connection
+    bus.close()
