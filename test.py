@@ -7,24 +7,25 @@ import websockets
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_mlx90614
+import adafruit_ssd1306
+from PIL import Image, ImageDraw, ImageFont
 
 # Initialize the I2C bus and devices with a short delay for stability
-def initialize_ads():
-    i2c_ads = busio.I2C(board.SCL, board.SDA)
-    time.sleep(0.5)  # Short delay to stabilize the I2C bus
-    adc = ADS1115(i2c_ads)
-    adc.gain = 1
-    return adc
+i2c = busio.I2C(board.SCL, board.SDA)
+adc = ADS1115(i2c)
+mlx = adafruit_mlx90614.MLX90614(i2c)
 
-# Initialize the MLX90614 temperature sensor
-def initialize_mlx():
-    i2c_temp = busio.I2C(board.SCL, board.SDA)
-    mlx = adafruit_mlx90614.MLX90614(i2c_temp)
-    return mlx
+# Initialize the OLED display (DFR0648)
+WIDTH = 128
+HEIGHT = 64
+oled = adafruit_ssd1306.SSD1306_I2C(WIDTH, HEIGHT, i2c)
 
-# Set up initial I2C devices
-adc = initialize_ads()
-mlx = initialize_mlx()
+# Clear the display
+oled.fill(0)
+oled.show()
+
+# Load default font
+font = ImageFont.load_default()
 
 # Moving average filter settings for GSR
 window_size = 10  # Number of readings to average
@@ -75,7 +76,6 @@ async def monitor_heart_rate(websocket):
     global last_pulse_time, first_pulse
     while True:
         try:
-            # Read heart rate data
             voltage = chan_hr.voltage
             if voltage > high_threshold and first_pulse:
                 last_pulse_time = time.time()
@@ -84,7 +84,14 @@ async def monitor_heart_rate(websocket):
                 pulse_interval = (time.time() - last_pulse_time) * 1000  # in ms
                 last_pulse_time = time.time()
                 bpm = 60000 / pulse_interval
-                await websocket.send(f"Heart Rate: {bpm:.2f} BPM")
+                message = f"Heart Rate: {bpm:.2f} BPM"
+                await websocket.send(message)
+                display_message_on_oled(message)
+            else:
+                message = "Heart Rate: No human contact detected"
+                await websocket.send(message)
+                display_message_on_oled(message)
+
             time.sleep(0.1)
         except Exception as e:
             await websocket.send(f"Heart rate monitoring error: {e}")
@@ -95,10 +102,18 @@ async def monitor_temperature(websocket):
             if readings and readings[-1] < contact_detection_threshold:
                 ambient_temp = mlx.ambient_temperature
                 object_temp = mlx.object_temperature
-                await websocket.send(f"Ambient Temperature: {ambient_temp:.2f}°C")
-                await websocket.send(f"Object Temperature: {object_temp:.2f}°C")
+                message_ambient = f"Ambient Temp: {ambient_temp:.2f}°C"
+                message_object = f"Object Temp: {object_temp:.2f}°C"
+                await websocket.send(message_ambient)
+                await websocket.send(message_object)
+                display_message_on_oled(f"{message_ambient}\n{message_object}")
             else:
-                await websocket.send("No human contact detected (temperature)")
+                message_ambient = "Ambient Temp: No human contact detected"
+                message_object = "Object Temp: No human contact detected"
+                await websocket.send(message_ambient)
+                await websocket.send(message_object)
+                display_message_on_oled(f"{message_ambient}\n{message_object}")
+
             time.sleep(3)
         except Exception as e:
             await websocket.send(f"Temperature monitoring error: {e}")
@@ -111,15 +126,27 @@ async def monitor_gsr(websocket):
             if smoothed_value < contact_detection_threshold:
                 contact_status = "Contact with human detected"
                 stress_level = determine_stress_level(smoothed_value)
-                await websocket.send(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
+                message = f"Stress: {stress_level}"
+                await websocket.send(message)
+                display_message_on_oled(message)
             else:
-                await websocket.send("No human contact detected (GSR)")
+                message = "Stress: No human contact detected"
+                await websocket.send(message)
+                display_message_on_oled(message)
+
             time.sleep(3)
         except Exception as e:
             await websocket.send(f"GSR monitoring error: {e}")
 
+def display_message_on_oled(message):
+    oled.fill(0)
+    image = Image.new("1", (WIDTH, HEIGHT))
+    draw = ImageDraw.Draw(image)
+    draw.text((0, 0), message, font=font, fill=255)
+    oled.image(image)
+    oled.show()
+
 async def handler(websocket, path):
-    # Run the monitoring functions in parallel using asyncio.gather
     await asyncio.gather(
         monitor_heart_rate(websocket),
         monitor_temperature(websocket),
