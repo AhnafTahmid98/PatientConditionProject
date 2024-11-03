@@ -17,7 +17,7 @@ try:
         # Turn on the green LED and print a message
         GPIO.output(green_led, GPIO.HIGH)
         print("Green LED is ON")
-        time.sleep(10)  # LED stays on for 10 seconds
+        time.sleep(1)  # LED stays on for 10 seconds
         
         # Turn off the green LED and print a message
         GPIO.output(green_led, GPIO.LOW)
@@ -26,7 +26,7 @@ try:
         # Turn on the yellow LED and print a message
         GPIO.output(yellow_led, GPIO.HIGH)
         print("Yellow LED is ON")
-        time.sleep(10)  # LED stays on for 10 seconds
+        time.sleep(1)  # LED stays on for 10 seconds
         
         # Turn off the yellow LED and print a message
         GPIO.output(yellow_led, GPIO.LOW)
@@ -35,7 +35,7 @@ try:
         # Turn on the red LED and print a message
         GPIO.output(red_led, GPIO.HIGH)
         print("Red LED is ON")
-        time.sleep(10)  # LED stays on for 10 seconds
+        time.sleep(1)  # LED stays on for 10 seconds
         
         # Turn off the red LED and print a message
         GPIO.output(red_led, GPIO.LOW)
