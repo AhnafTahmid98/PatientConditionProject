@@ -4,11 +4,43 @@ import busio
 import threading
 import asyncio
 import websockets
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+import os
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_mlx90614
 import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Email configuration loaded from .env file
+EMAIL_ADDRESS = os.getenv('SENDER_EMAIL')
+EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD')
+RECIPIENT_EMAIL = 'patient_email@example.com'  # Replace with the actual recipient's email
+SMTP_SERVER = 'smtp.gmail.com'
+SMTP_PORT = 587
+
+# Function to send an alert email
+def send_email_alert(subject, body):
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_ADDRESS
+        msg['To'] = RECIPIENT_EMAIL
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain'))
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()  # Secure the connection
+            server.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            server.sendmail(EMAIL_ADDRESS, RECIPIENT_EMAIL, msg.as_string())
+        print("Alert email sent successfully.")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
 
 # Initialize the I2C bus and devices with a short delay for stability
 i2c = busio.I2C(board.SCL, board.SDA)
@@ -37,6 +69,11 @@ contact_detection_threshold = 13000
 relaxed_threshold = baseline_value * 0.9
 normal_threshold = baseline_value * 1.1
 elevated_threshold = baseline_value * 1.3
+
+# Alert thresholds
+BPM_ALERT_THRESHOLD = 100  # Example threshold for high BPM
+TEMP_ALERT_THRESHOLD = 37.5  # Example threshold for high object temperature in °C
+STRESS_ALERT_LEVEL = "High"  # Alert when stress level is "High"
 
 def read_gsr():
     # Read the analog value from channel 1 (A1)
@@ -87,6 +124,11 @@ async def monitor_heart_rate(websocket):
                 message = f"Heart Rate: {bpm:.2f} BPM"
                 await websocket.send(message)
                 display_message_on_oled(message)
+
+                # Check for alert condition
+                if bpm > BPM_ALERT_THRESHOLD:
+                    send_email_alert("High BPM Alert", f"Patient's BPM is high: {bpm:.2f} BPM")
+
             else:
                 message = "Heart Rate: No human contact detected"
                 await websocket.send(message)
@@ -107,6 +149,11 @@ async def monitor_temperature(websocket):
                 await websocket.send(message_ambient)
                 await websocket.send(message_object)
                 display_message_on_oled(f"{message_ambient}\n{message_object}")
+
+                # Check for alert condition
+                if object_temp > TEMP_ALERT_THRESHOLD:
+                    send_email_alert("High Temperature Alert", f"Patient's temperature is high: {object_temp:.2f}°C")
+
             else:
                 message_ambient = "Ambient Temp: No human contact detected"
                 message_object = "Object Temp: No human contact detected"
@@ -129,6 +176,11 @@ async def monitor_gsr(websocket):
                 message = f"Stress: {stress_level}"
                 await websocket.send(message)
                 display_message_on_oled(message)
+
+                # Check for alert condition
+                if stress_level == STRESS_ALERT_LEVEL:
+                    send_email_alert("High Stress Alert", "Patient's stress level is high.")
+
             else:
                 message = "Stress: No human contact detected"
                 await websocket.send(message)
