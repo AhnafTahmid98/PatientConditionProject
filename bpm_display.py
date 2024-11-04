@@ -21,12 +21,14 @@ oled.show()
 
 # Load font for OLED display
 try:
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)  # 16-point font
+    font = ImageFont.truetype(
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16
+    )  # 16-point font
 except IOError:
     font = ImageFont.load_default()
 
 # Variables for pulse detection
-high_threshold = 2.5
+high_threshold = 2.5  # Example threshold values
 low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
@@ -39,7 +41,7 @@ def update_oled(bpm):
 
     # Draw the BPM text
     draw.text((0, 0), f"BPM: {int(bpm)}", font=font, fill=255)
-    
+
     # Display image on OLED
     oled.image(image)
     oled.show()
@@ -69,6 +71,9 @@ async def send_bpm(websocket):
                 # Update OLED display with BPM
                 update_oled(bpm)
 
+                # Print BPM before sending it to WebSocket client
+                print(f"BPM: {bpm:.2f}")
+
                 # Send BPM data to WebSocket client
                 await websocket.send(str(bpm))
 
@@ -81,7 +86,7 @@ async def send_bpm(websocket):
 # Main function to run the WebSocket server
 async def main():
     print("Starting WebSocket server on ws://0.0.0.0:6789...")
-    async with websockets.serve(send_bpm, "0.0.0.0", 6789):  # Replace with Pi IP if needed
+    async with websockets.serve(send_bpm, "0.0.0.0", 6789):
         await asyncio.Future()  # Run forever
 
 # Run the WebSocket server
