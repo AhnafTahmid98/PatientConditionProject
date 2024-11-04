@@ -66,13 +66,12 @@ async def send_bpm(websocket):
                 last_pulse_time = time.time()
                 bpm = 60000 / pulse_interval
                 print(f"Pulse detected. Interval: {pulse_interval:.2f} ms")
-                print(f"Heart Rate: {bpm:.2f} BPM")
+                
+                # Print BPM as an integer in the desired format
+                print(f"BPM: {int(bpm)}")
 
                 # Update OLED display with BPM
                 update_oled(bpm)
-
-                # Print BPM before sending it to WebSocket client
-                print(f"BPM: {bpm:.2f}")
 
                 # Send BPM data to WebSocket client
                 await websocket.send(str(bpm))
