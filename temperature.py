@@ -9,16 +9,25 @@ i2c = busio.I2C(board.SCL, board.SDA)
 # Create MLX90614 object
 mlx = adafruit_mlx90614.MLX90614(i2c)
 
-# Set a threshold to detect the presence of a human body (in °C)
-HUMAN_TEMP_THRESHOLD = 30.0  # Adjust this value as needed
+# Set a threshold to detect the presence of a human body
+HUMAN_TEMP_THRESHOLD = 30.0  # Adjust based on initial testing
+HUMAN_TEMP_RANGE = (30.0, 40.0)  # Typical human body temperature range in °C
+
+# Function to get stable temperature readings by averaging
+def get_stable_temperature(sensor, readings=5):
+    temp_sum = 0
+    for _ in range(readings):
+        temp_sum += sensor.object_temperature
+        time.sleep(0.1)  # Small delay between readings
+    return temp_sum / readings
 
 try:
     while True:
         ambient_temp = mlx.ambient_temperature
-        object_temp = mlx.object_temperature
+        object_temp = get_stable_temperature(mlx)
         
-        # Check if the object temperature indicates proximity to a human body
-        if object_temp > HUMAN_TEMP_THRESHOLD:
+        # Check if the object temperature is within the human body temperature range
+        if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1]:
             print("Human body detected.")
             print("Ambient Temperature: {:.2f}°C".format(ambient_temp))
             print("Human Body Temperature: {:.2f}°C".format(object_temp))
