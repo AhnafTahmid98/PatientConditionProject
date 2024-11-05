@@ -1,7 +1,6 @@
 import time
 import board
 import busio
-import threading
 import asyncio
 import websockets
 import smtplib
@@ -75,39 +74,18 @@ BPM_ALERT_THRESHOLD = 100  # Example threshold for high BPM
 TEMP_ALERT_THRESHOLD = 37.5  # Example threshold for high object temperature in °C
 STRESS_ALERT_LEVEL = "High"  # Alert when stress level is "High"
 
-def read_gsr():
-    # Read the analog value from channel 1 (A1)
-    chan = AnalogIn(adc, 1)
-    return chan.value
+# Rate limiting for email alerts
+last_email_time = 0
+EMAIL_COOLDOWN = 300  # 5 minutes in seconds
 
-def get_moving_average(value):
-    # Add the new reading to the list
-    readings.append(value)
-    
-    # Keep only the last 'window_size' readings
-    if len(readings) > window_size:
-        readings.pop(0)
-    
-    # Calculate and return the average
-    return sum(readings) / len(readings)
-
-def determine_stress_level(smoothed_value):
-    # Determine the stress level based on thresholds
-    if smoothed_value < relaxed_threshold:
-        return "Relaxed"
-    elif relaxed_threshold <= smoothed_value < normal_threshold:
-        return "Normal"
-    elif normal_threshold <= smoothed_value < elevated_threshold:
-        return "Elevated"
+def send_email_alert_if_critical(subject, body):
+    global last_email_time
+    current_time = time.time()
+    if current_time - last_email_time > EMAIL_COOLDOWN:
+        send_email_alert(subject, body)
+        last_email_time = current_time
     else:
-        return "High"
-
-# Variables for heart rate monitoring
-chan_hr = AnalogIn(adc, 0)  # Using channel A0 for heart rate
-high_threshold = 2.5  # Example threshold values
-low_threshold = 1.5
-last_pulse_time = 0
-first_pulse = True
+        print("Email not sent: Cooldown period active.")
 
 async def monitor_heart_rate(websocket):
     global last_pulse_time, first_pulse
@@ -125,9 +103,9 @@ async def monitor_heart_rate(websocket):
                 await websocket.send(message)
                 display_message_on_oled(message)
 
-                # Check for alert condition
+                # Send email only if the BPM is critically high
                 if bpm > BPM_ALERT_THRESHOLD:
-                    send_email_alert("High BPM Alert", f"Patient's BPM is high: {bpm:.2f} BPM")
+                    send_email_alert_if_critical("High BPM Alert", f"Patient's BPM is critically high: {bpm:.2f} BPM")
 
             else:
                 message = "Heart Rate: No human contact detected"
@@ -150,9 +128,9 @@ async def monitor_temperature(websocket):
                 await websocket.send(message_object)
                 display_message_on_oled(f"{message_ambient}\n{message_object}")
 
-                # Check for alert condition
+                # Send email only if the temperature is critically high
                 if object_temp > TEMP_ALERT_THRESHOLD:
-                    send_email_alert("High Temperature Alert", f"Patient's temperature is high: {object_temp:.2f}°C")
+                    send_email_alert_if_critical("High Temperature Alert", f"Patient's temperature is critically high: {object_temp:.2f}°C")
 
             else:
                 message_ambient = "Ambient Temp: No human contact detected"
@@ -177,9 +155,9 @@ async def monitor_gsr(websocket):
                 await websocket.send(message)
                 display_message_on_oled(message)
 
-                # Check for alert condition
+                # Send email only if the stress level is critical
                 if stress_level == STRESS_ALERT_LEVEL:
-                    send_email_alert("High Stress Alert", "Patient's stress level is high.")
+                    send_email_alert_if_critical("High Stress Alert", "Patient's stress level is critically high.")
 
             else:
                 message = "Stress: No human contact detected"
