@@ -80,7 +80,7 @@ async def send_bpm(websocket):
                 update_oled_with_graph(bpm)
 
                 # Send both current BPM and the array of historical BPM data
-                data = {'bpm': bpm, 'bpm_data': bpm_data}
+                data = {'BPM': bpm, 'BPM_DATA': bpm_data}
                 await websocket.send(json.dumps(data))
 
             await asyncio.sleep(0.1)
