@@ -9,9 +9,9 @@ i2c = busio.I2C(board.SCL, board.SDA)
 # Create MLX90614 object
 mlx = adafruit_mlx90614.MLX90614(i2c)
 
-# Updated human temperature range for stable detection
-HUMAN_TEMP_RANGE = (34.0, 41.0)  # Adjusted human body temperature range
-HUMAN_TEMP_THRESHOLD_OFFSET = 2.0  # Offset above ambient temperature for detection
+# Defined human temperature range for reliable detection
+HUMAN_TEMP_RANGE = (34.0, 41.0)  # Expected human body temperature range
+HUMAN_TEMP_THRESHOLD_OFFSET = 2.0  # Offset above ambient temperature for human detection
 
 # Function to get stable temperature readings by averaging
 def get_stable_temperature(sensor, readings=10):
@@ -21,29 +21,28 @@ def get_stable_temperature(sensor, readings=10):
         time.sleep(0.05)  # Small delay between readings
     return temp_sum / readings
 
-# Function to dynamically adjust the threshold based on ambient temp
+# Function to dynamically adjust the threshold based on ambient temperature
 def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
-    # Use ambient temp to set a dynamic threshold slightly above it
     return ambient_temp + offset
 
 try:
     while True:
+        # Read ambient temperature for environmental measurement
         ambient_temp = mlx.ambient_temperature
+        print("Environmental Temperature: {:.2f}°C".format(ambient_temp))
+
+        # Get a stable reading for the object temperature to check for human presence
         object_temp = get_stable_temperature(mlx)
         
-        # Dynamically set a human detection threshold close to ambient
+        # Set a dynamic threshold based on the ambient temperature
         dynamic_threshold = get_dynamic_threshold(ambient_temp)
 
-        # Check if the object temperature is within the human temperature range and above the dynamic threshold
+        # Check if object temperature meets human detection criteria
         if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
             print("Human body detected.")
-            print("Ambient Temperature: {:.2f}°C".format(ambient_temp))
             print("Human Body Temperature: {:.2f}°C".format(object_temp))
         else:
-            # Measure object temperature (not human body)
             print("No human body detected.")
-            print("Ambient Temperature: {:.2f}°C".format(ambient_temp))
-            print("Object Temperature: {:.2f}°C".format(object_temp))
 
         # Pause briefly before the next reading
         time.sleep(1)
