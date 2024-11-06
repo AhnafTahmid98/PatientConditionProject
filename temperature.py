@@ -9,12 +9,12 @@ i2c = busio.I2C(board.SCL, board.SDA)
 # Create MLX90614 object
 mlx = adafruit_mlx90614.MLX90614(i2c)
 
-# Defined human temperature range for reliable detection
-HUMAN_TEMP_RANGE = (34.0, 41.0)  # Expected human body temperature range
-HUMAN_TEMP_THRESHOLD_OFFSET = 2.0  # Offset above ambient temperature for human detection
+# Updated human temperature range and offset for improved detection
+HUMAN_TEMP_RANGE = (33.0, 42.0)  # Slightly expanded range for human body temperature
+HUMAN_TEMP_THRESHOLD_OFFSET = 3.0  # Increased offset above ambient temperature
 
 # Function to get stable temperature readings by averaging
-def get_stable_temperature(sensor, readings=10):
+def get_stable_temperature(sensor, readings=15):
     temp_sum = 0
     for _ in range(readings):
         temp_sum += sensor.object_temperature
@@ -27,13 +27,13 @@ def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
 
 try:
     while True:
-        # Read ambient temperature for environmental measurement
+        # Measure and display ambient (environmental) temperature
         ambient_temp = mlx.ambient_temperature
         print("Environmental Temperature: {:.2f}°C".format(ambient_temp))
 
-        # Get a stable reading for the object temperature to check for human presence
+        # Get a stable reading for object temperature to check for human presence
         object_temp = get_stable_temperature(mlx)
-        
+
         # Set a dynamic threshold based on the ambient temperature
         dynamic_threshold = get_dynamic_threshold(ambient_temp)
 
