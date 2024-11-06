@@ -9,9 +9,9 @@ i2c = busio.I2C(board.SCL, board.SDA)
 # Create MLX90614 object
 mlx = adafruit_mlx90614.MLX90614(i2c)
 
-# Adjusted range and offset for accurate human detection in warmer environments
-HUMAN_TEMP_RANGE = (35.0, 38.5)
-HUMAN_TEMP_THRESHOLD_OFFSET = 1.5  # Lowered offset due to high ambient temperature
+# Refined human temperature range and reduced offset
+HUMAN_TEMP_RANGE = (35.0, 39.0)  # Slightly expanded range
+HUMAN_TEMP_THRESHOLD_OFFSET = 0.5  # Lower offset for higher sensitivity
 
 # Function to get stable temperature readings by averaging
 def get_stable_temperature(sensor, readings=20):
@@ -21,7 +21,7 @@ def get_stable_temperature(sensor, readings=20):
         time.sleep(0.05)
     return temp_sum / readings
 
-# Function to dynamically adjust threshold based on ambient temperature
+# Function to dynamically adjust the threshold based on ambient temperature
 def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
     return ambient_temp + offset
 
