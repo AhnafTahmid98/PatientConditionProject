@@ -10,7 +10,7 @@ i2c = busio.I2C(board.SCL, board.SDA)
 mlx = adafruit_mlx90614.MLX90614(i2c)
 
 # Updated human temperature range and offset for improved detection
-HUMAN_TEMP_RANGE = (33.0, 42.0)  # Slightly expanded range for human body temperature
+HUMAN_TEMP_RANGE = (30.0, 42.0)  # Slightly expanded range for human body temperature
 HUMAN_TEMP_THRESHOLD_OFFSET = 3.0  # Increased offset above ambient temperature
 
 # Function to get stable temperature readings by averaging
