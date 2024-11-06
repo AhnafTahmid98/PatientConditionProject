@@ -11,7 +11,7 @@ mlx = adafruit_mlx90614.MLX90614(i2c)
 
 # Adjusted range and offset for normal human body temperature detection
 HUMAN_TEMP_RANGE = (35.0, 38.5)  # Typical human body temperature range
-HUMAN_TEMP_THRESHOLD_OFFSET = 2.0  # Reduced offset above ambient temperature
+HUMAN_TEMP_THRESHOLD_OFFSET = 1.0  # Reduced offset above ambient temperature
 
 # Function to get stable temperature readings by averaging
 def get_stable_temperature(sensor, readings=15):
