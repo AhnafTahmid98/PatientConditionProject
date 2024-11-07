@@ -6,13 +6,15 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_mlx90614
 import threading
 
-# Initialize I2C bus for ADS1115 and MLX90614
-i2c_ads = busio.I2C(board.SCL, board.SDA)
-adc = ADS1115(i2c_ads)
+# Initialize I2C bus
+i2c = busio.I2C(board.SCL, board.SDA)
+
+# Initialize ADS1115 ADC at address 0x48
+adc = ADS1115(i2c, address=0x48)
 adc.gain = 1
 
-i2c_mlx = busio.I2C(board.SCL, board.SDA)
-mlx = adafruit_mlx90614.MLX90614(i2c_mlx)
+# Initialize MLX90614 Temperature Sensor at address 0x5a
+mlx = adafruit_mlx90614.MLX90614(i2c, address=0x5a)
 
 # Settings for GSR
 window_size = 10
@@ -51,23 +53,28 @@ first_pulse = True
 
 def monitor_heart_rate():
     global last_pulse_time, first_pulse
-    chan_heart_rate = AnalogIn(adc, 0)
-
-    print("Starting heart rate measurement on A0...")
     while True:
-        voltage = chan_heart_rate.voltage
-        if voltage > high_threshold and first_pulse:
-            print("Pulse detected (first pulse)")
-            last_pulse_time = time.time()
-            first_pulse = False
+        try:
+            chan_heart_rate = AnalogIn(adc, 0)
+            voltage = chan_heart_rate.voltage
+            if voltage > high_threshold and first_pulse:
+                print("Pulse detected (first pulse)")
+                last_pulse_time = time.time()
+                first_pulse = False
 
-        elif voltage > high_threshold and time.time() - last_pulse_time > 0.4:
-            pulse_interval = (time.time() - last_pulse_time) * 1000  # ms
-            last_pulse_time = time.time()
-            bpm = 60000 / pulse_interval
-            print(f"Heart Rate: {bpm:.2f} BPM")
+            elif voltage > high_threshold and time.time() - last_pulse_time > 0.4:
+                pulse_interval = (time.time() - last_pulse_time) * 1000  # ms
+                last_pulse_time = time.time()
+                bpm = 60000 / pulse_interval
+                print(f"Heart Rate: {bpm:.2f} BPM")
 
-        time.sleep(0.1)
+            time.sleep(0.1)
+
+        except OSError as e:
+            print("I2C communication error in heart rate monitoring. Reinitializing ADS1115...")
+            global adc
+            adc = ADS1115(i2c, address=0x48)  # Reinitialize the I2C device
+            time.sleep(1)
 
 # GSR Monitoring Thread
 def monitor_gsr():
@@ -84,8 +91,10 @@ def monitor_gsr():
             time.sleep(3)
 
         except OSError as e:
-            print("I2C communication error. Reinitializing I2C bus...")
-            adc = initialize_devices()  # Reinitialize the I2C device
+            print("I2C communication error in GSR monitoring. Reinitializing ADS1115...")
+            global adc
+            adc = ADS1115(i2c, address=0x48)  # Reinitialize the I2C device
+            time.sleep(1)
 
 # Temperature Monitoring Functions
 HUMAN_TEMP_RANGE = (35.8, 38.0)
@@ -103,6 +112,7 @@ def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
     return ambient_temp + offset
 
 def monitor_temperature():
+    global HUMAN_TEMP_THRESHOLD_OFFSET
     no_detection_count = 0
     while True:
         object_temp = get_stable_temperature(mlx)
