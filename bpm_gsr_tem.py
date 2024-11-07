@@ -144,10 +144,11 @@ def monitor_temperature():
             no_detection_count = 0
         time.sleep(1)
 
-# OLED Display Thread with Adjusted Font and Spacing
+# OLED Display Thread with Simple Font
 def update_display():
+    # Use DejaVu Sans for better readability
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf", 16)  # Arial, size 16
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
     except IOError:
         font = ImageFont.load_default()
     
