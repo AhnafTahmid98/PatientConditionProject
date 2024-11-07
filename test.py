@@ -10,17 +10,17 @@ from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
 
 # LED and buzzer pin definitions
-green_led = 17  # GPIO 17
-yellow_led = 27  # GPIO 27
-red_led = 22  # GPIO 22
-buzzer_pin = 23  # GPIO 23
+GREEN_LED = 17  # GPIO 17
+YELLOW_LED = 27  # GPIO 27
+RED_LED = 22  # GPIO 22
+BUZZER_PIN = 23  # GPIO 23
 
 # GPIO setup for LEDs and buzzer
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(green_led, GPIO.OUT)
-GPIO.setup(yellow_led, GPIO.OUT)
-GPIO.setup(red_led, GPIO.OUT)
-GPIO.setup(buzzer_pin, GPIO.OUT)
+GPIO.setup(GREEN_LED, GPIO.OUT)
+GPIO.setup(YELLOW_LED, GPIO.OUT)
+GPIO.setup(RED_LED, GPIO.OUT)
+GPIO.setup(BUZZER_PIN, GPIO.OUT)
 
 # Initialize I2C bus and sensors
 i2c = busio.I2C(board.SCL, board.SDA)
@@ -34,16 +34,17 @@ bpm_value = 0
 temperature_value = 0
 stress_level = "None"
 status = "Normal"
+human_interaction = False
 
 # Data lock
 data_lock = threading.Lock()
 running = True  # Flag to control threads
 
 # Thresholds for GSR, BPM, and Temperature
-baseline_value = 11000
-relaxed_threshold = baseline_value * 0.9
-normal_threshold = baseline_value * 1.1
-elevated_threshold = baseline_value * 1.3
+BASELINE_VALUE = 11000
+RELAXED_THRESHOLD = BASELINE_VALUE * 0.9
+NORMAL_THRESHOLD = BASELINE_VALUE * 1.1
+ELEVATED_THRESHOLD = BASELINE_VALUE * 1.3
 
 # Heart rate thresholds and variables
 high_threshold = 2.5
@@ -56,12 +57,12 @@ bpm_history = []  # For storing recent BPM values for graphing
 normal_bpm_range = (60, 100)
 warning_bpm_range = (50, 120)
 
-# Function to set LED and buzzer based on status
-def set_leds_and_buzzer(status):
-    GPIO.output(green_led, GPIO.HIGH if status == "Normal" else GPIO.LOW)
-    GPIO.output(yellow_led, GPIO.HIGH if status == "Warning" else GPIO.LOW)
-    GPIO.output(red_led, GPIO.HIGH if status == "Critical" else GPIO.LOW)
-    GPIO.output(buzzer_pin, GPIO.HIGH if status == "Critical" else GPIO.LOW)
+# Function to control LEDs and buzzer based on stress level and interaction status
+def set_leds_and_buzzer(stress, interaction):
+    GPIO.output(GREEN_LED, GPIO.HIGH if stress == "Normal" else GPIO.LOW)
+    GPIO.output(YELLOW_LED, GPIO.HIGH if stress == "Elevated" else GPIO.LOW)
+    GPIO.output(RED_LED, GPIO.HIGH if stress == "High" and interaction else GPIO.LOW)
+    GPIO.output(BUZZER_PIN, GPIO.HIGH if stress == "High" and interaction else GPIO.LOW)
 
 # Update status based on BPM, GSR, and Temperature
 def update_status():
@@ -72,7 +73,7 @@ def update_status():
         status = "Warning"
     else:
         status = "Normal"
-    set_leds_and_buzzer(status)
+    set_leds_and_buzzer(stress_level, human_interaction)
 
 # GSR Monitoring
 def read_gsr():
@@ -80,14 +81,20 @@ def read_gsr():
     return chan_gsr.value
 
 def determine_stress_level(gsr_value):
-    if gsr_value < relaxed_threshold:
-        return "Normal"
-    elif gsr_value < normal_threshold:
-        return "Normal"
-    elif gsr_value < elevated_threshold:
-        return "Elevated"
+    global human_interaction
+    if gsr_value < 13000:  # Indicate human interaction
+        human_interaction = True
+        if gsr_value < RELAXED_THRESHOLD:
+            return "Normal"
+        elif gsr_value < NORMAL_THRESHOLD:
+            return "Normal"
+        elif gsr_value < ELEVATED_THRESHOLD:
+            return "Elevated"
+        else:
+            return "High"
     else:
-        return "High"
+        human_interaction = False
+        return "No contact"
 
 def monitor_gsr():
     global stress_level
@@ -96,7 +103,7 @@ def monitor_gsr():
             gsr_value = read_gsr()
             stress_level = determine_stress_level(gsr_value)
             with data_lock:
-                print(f"GSR Value: {gsr_value}, Stress Level: {stress_level}")
+                print(f"GSR Value: {gsr_value}, Stress Level: {stress_level}, Interaction: {human_interaction}")
             update_status()
             time.sleep(3)
         except OSError:
@@ -238,5 +245,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Monitoring stopped.")
         running = False
-        set_leds_and_buzzer("Normal")  # Turn off all LEDs and buzzer on exit
+        set_leds_and_buzzer("Normal", False)  # Turn off all LEDs and buzzer on exit
         GPIO.cleanup()
