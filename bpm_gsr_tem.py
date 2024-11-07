@@ -153,24 +153,24 @@ def monitor_temperature():
 
 # OLED Display Thread with Simple Font and Graph
 def update_display():
-    # Use DejaVu Sans for better readability
+    # Use DejaVu Sans with font size 12 for better readability and spacing
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
     except IOError:
         font = ImageFont.load_default()
     
     while running:
         with data_lock:
-            # Create a blank image for drawing with larger font
+            # Create a blank image for drawing with smaller font
             image = Image.new("1", (128, 64))
             draw = ImageDraw.Draw(image)
             
-            # Display BPM, Temperature, and Stress Level
+            # Display BPM, Temperature, and Stress Level with adjusted spacing
             draw.text((0, 0), f"BPM:", font=font, fill=255)
-            draw.text((0, 22), f"Temp: {temperature_value:.2f}C", font=font, fill=255)
-            draw.text((0, 44), f"Stress: {stress_level}", font=font, fill=255)
+            draw.text((0, 20), f"Temp: {temperature_value:.2f}C", font=font, fill=255)
+            draw.text((0, 40), f"Stress: {stress_level}", font=font, fill=255)
             
-            # Draw BPM Graph
+            # Draw BPM Graph on the right side
             if bpm_history:
                 max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
                 min_bpm = min(bpm_history)
