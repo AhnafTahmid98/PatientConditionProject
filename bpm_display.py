@@ -1,100 +1,159 @@
 import time
-import asyncio
-import websockets
 import board
 import busio
+import threading
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
-import json
+import RPi.GPIO as GPIO
 
-# Initialize I2C for OLED display and ADS1115
+# LED and buzzer pin definitions
+green_led = 17  # GPIO 17
+yellow_led = 27  # GPIO 27
+red_led = 22    # GPIO 22
+buzzer_pin = 23 # GPIO 23
+
+# GPIO setup for LEDs and buzzer
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(green_led, GPIO.OUT)
+GPIO.setup(yellow_led, GPIO.OUT)
+GPIO.setup(red_led, GPIO.OUT)
+GPIO.setup(buzzer_pin, GPIO.OUT)
+
+# Initialize I2C bus and ADC
 i2c = busio.I2C(board.SCL, board.SDA)
-time.sleep(0.1)
-ads = ADS1115(i2c)
-chan = AnalogIn(ads, 0)  # Using channel A0 for heart rate sensor
+adc = ADS1115(i2c, address=0x48)
+adc.gain = 1
 
 # Initialize OLED display
-oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c)
-oled.fill(0)
-oled.show()
+oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
 
-# Load font for OLED display
-try:
-    font = ImageFont.truetype(
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12
-    )
-except IOError:
-    font = ImageFont.load_default()
+# Shared variables
+bpm_value = 0
+status = "Normal"
+bpm_history = []  # For storing recent BPM values for graphing
 
-# Variables for pulse detection
-high_threshold = 2.5
+# Heart rate thresholds and variables
+high_threshold = 2.5  # Voltage thresholds for pulse detection
 low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
 
-# BPM data for graphing
-bpm_data = []
+# Lock for synchronizing data access
+data_lock = threading.Lock()
+running = True
 
-# Function to update OLED display with BPM and plot graph
-def update_oled_with_graph(bpm):
-    if len(bpm_data) > 30:
-        bpm_data.pop(0)
-    bpm_data.append(bpm)
+# BPM thresholds for status levels
+normal_bpm_range = (60, 100)
+warning_bpm_range = (50, 120)
 
-    image = Image.new("1", (oled.width, oled.height))
-    draw = ImageDraw.Draw(image)
-    draw.text((0, 0), f"BPM: {int(bpm)}", font=font, fill=255)
+# Function to set LED and buzzer based on status
+def set_leds_and_buzzer(status):
+    GPIO.output(green_led, GPIO.HIGH if status == "Normal" else GPIO.LOW)
+    GPIO.output(yellow_led, GPIO.HIGH if status == "Warning" else GPIO.LOW)
+    GPIO.output(red_led, GPIO.HIGH if status == "Critical" else GPIO.LOW)
+    GPIO.output(buzzer_pin, GPIO.HIGH if status == "Critical" else GPIO.LOW)
 
-    if len(bpm_data) > 1:
-        min_bpm, max_bpm = 50, 150
-        scaled_data = [
-            int(40 - 40 * (value - min_bpm) / (max_bpm - min_bpm))
-            for value in bpm_data
-        ]
-        for i in range(1, len(scaled_data)):
-            draw.line(
-                [(i - 1) * 4, scaled_data[i - 1] + 20, i * 4, scaled_data[i] + 20],
-                fill=255,
-            )
+# Update status based on BPM value
+def update_status():
+    global status
+    if bpm_value < 50 or bpm_value > 120:
+        status = "Critical"
+    elif 50 <= bpm_value < 60 or 100 < bpm_value <= 120:
+        status = "Warning"
+    else:
+        status = "Normal"
+    set_leds_and_buzzer(status)
 
-    oled.image(image)
-    oled.show()
-
-# Async function to send BPM data over WebSocket and update OLED
-async def send_bpm(websocket):
-    global last_pulse_time, first_pulse
-
-    while True:
+# Heart Rate Monitoring
+def monitor_heart_rate():
+    global bpm_value, bpm_history, last_pulse_time, first_pulse, running
+    while running:
         try:
-            voltage = chan.voltage
+            chan_heart_rate = AnalogIn(adc, 0)
+            voltage = chan_heart_rate.voltage
+            current_time = time.time()
+            
+            # Detecting the pulse
             if voltage > high_threshold and first_pulse:
-                last_pulse_time = time.time()
+                last_pulse_time = current_time
                 first_pulse = False
+            elif voltage > high_threshold and (current_time - last_pulse_time) > 0.4:
+                pulse_interval = (current_time - last_pulse_time) * 1000  # Convert to milliseconds
+                bpm_value = 60000 / pulse_interval
+                last_pulse_time = current_time
 
-            elif voltage > high_threshold and time.time() - last_pulse_time > 0.4:
-                pulse_interval = (time.time() - last_pulse_time) * 1000
-                last_pulse_time = time.time()
-                bpm = 60000 / pulse_interval
-                update_oled_with_graph(bpm)
+                # Update BPM history for graphing
+                with data_lock:
+                    bpm_history.append(bpm_value)
+                    if len(bpm_history) > 20:  # Limit history length
+                        bpm_history.pop(0)
+                    print(f"Heart Rate: {bpm_value:.2f} BPM")
+                
+                # Update status based on new BPM value
+                update_status()
+            time.sleep(0.1)
+        except OSError:
+            print("Heart Rate error, reinitializing...")
+            time.sleep(1)
 
-                # Send both current BPM and the array of historical BPM data
-                data = {'BPM': bpm, 'BPM_DATA': bpm_data}
-                await websocket.send(json.dumps(data))
+# OLED Display Thread with Compact Layout for 128x32 Display
+def update_display():
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)  # Compact font
+    except IOError:
+        font = ImageFont.load_default()
+    
+    while running:
+        with data_lock:
+            # Create a blank image for drawing
+            image = Image.new("1", (128, 32))
+            draw = ImageDraw.Draw(image)
+            
+            # Display BPM value
+            draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
+            
+            # Draw BPM Graph beside BPM value
+            if bpm_history:
+                max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
+                min_bpm = min(bpm_history)
+                graph_height = 8
+                graph_width = 60
+                x_start = 50
+                y_start = 0
 
-            await asyncio.sleep(0.1)
+                for i in range(1, len(bpm_history)):
+                    y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
+                    y2 = y_start + graph_height - int((bpm_history[i] - min_bpm) / (max_bpm - min_bpm) * graph_height)
+                    x1 = x_start + (i - 1) * (graph_width // (len(bpm_history) - 1))
+                    x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
+                    draw.line((x1, y1, x2, y2), fill=255, width=1)
 
-        except Exception as e:
-            print(f"Error: {e}")
-            await asyncio.sleep(1)
+            # Display LED Status
+            draw.text((0, 12), f"Status: {status}", font=font, fill=255)
 
-# Main function to run the WebSocket server
-async def main():
-    async with websockets.serve(send_bpm, "0.0.0.0", 6789):
-        await asyncio.Future()
+            # Update OLED display
+            oled.image(image)
+            oled.show()
+        
+        # Refresh to avoid blur
+        time.sleep(1.5)
 
-try:
-    asyncio.run(main())
-except KeyboardInterrupt:
-    print("\nMeasurement stopped by user.")
+# Main function to start threads for heart rate monitoring and display updating
+if __name__ == "__main__":
+    try:
+        heart_rate_thread = threading.Thread(target=monitor_heart_rate)
+        display_thread = threading.Thread(target=update_display)
+        
+        heart_rate_thread.start()
+        display_thread.start()
+
+        heart_rate_thread.join()
+        display_thread.join()
+
+    except KeyboardInterrupt:
+        print("Monitoring stopped.")
+        running = False
+        set_leds_and_buzzer("Normal")  # Turn off all LEDs and buzzer on exit
+        GPIO.cleanup()
