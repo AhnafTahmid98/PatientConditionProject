@@ -168,7 +168,7 @@ def update_display():
             # Display BPM with actual value, Temperature, and Stress Level with adjusted spacing
             draw.text((0, 0), f"BPM: {bpm_value:.2f}", font=font, fill=255)
             
-            # Draw BPM Graph
+            # Draw BPM Graph with thicker lines for better clarity
             if bpm_history:
                 max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
                 min_bpm = min(bpm_history)
@@ -176,13 +176,15 @@ def update_display():
                 graph_width = 60
                 x_start = 0
                 y_start = 12
-                for i, bpm in enumerate(bpm_history):
-                    if max_bpm != min_bpm:
-                        y = y_start + graph_height - int((bpm - min_bpm) / (max_bpm - min_bpm) * graph_height)
-                    else:
-                        y = y_start + graph_height // 2
-                    x = x_start + i * (graph_width // len(bpm_history))
-                    draw.point((x, y), fill=255)
+
+                # Draw graph as thicker lines for clarity
+                for i in range(1, len(bpm_history)):
+                    # Scale y-values to fit within the graph height
+                    y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
+                    y2 = y_start + graph_height - int((bpm_history[i] - min_bpm) / (max_bpm - min_bpm) * graph_height)
+                    x1 = x_start + (i - 1) * (graph_width // (len(bpm_history) - 1))
+                    x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
+                    draw.line((x1, y1, x2, y2), fill=255, width=2)
 
             # Display Temperature and Stress Level
             draw.text((0, 24), f"Temp.: {temperature_value:.2f}C", font=font, fill=255)
