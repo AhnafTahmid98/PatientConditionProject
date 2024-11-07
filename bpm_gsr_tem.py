@@ -24,6 +24,7 @@ stress_level = "None"
 
 # Lock for synchronizing display updates
 data_lock = threading.Lock()
+running = True  # Flag to control the loop
 
 # Settings for GSR
 window_size = 10
@@ -62,7 +63,7 @@ first_pulse = True
 
 def monitor_heart_rate():
     global adc, bpm_value, last_pulse_time, first_pulse
-    while True:
+    while running:
         try:
             chan_heart_rate = AnalogIn(adc, 0)
             voltage = chan_heart_rate.voltage
@@ -86,7 +87,7 @@ def monitor_heart_rate():
 # GSR Monitoring Thread
 def monitor_gsr():
     global adc, stress_level
-    while True:
+    while running:
         try:
             gsr_value = read_gsr()
             smoothed_value = get_moving_average_gsr(gsr_value)
@@ -123,7 +124,7 @@ def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
 def monitor_temperature():
     global temperature_value, HUMAN_TEMP_THRESHOLD_OFFSET
     no_detection_count = 0
-    while True:
+    while running:
         object_temp = get_stable_temperature(mlx)
         dynamic_threshold = get_dynamic_threshold(mlx.ambient_temperature)
 
@@ -147,11 +148,11 @@ def monitor_temperature():
 def update_display():
     # Load a larger font (adjust the size as necessary)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf", 13)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Calibri.ttf", 16)
     except IOError:
         font = ImageFont.load_default()
     
-    while True:
+    while running:
         with data_lock:
             # Create a blank image for drawing with larger font
             image = Image.new("1", (128, 64))
@@ -187,3 +188,4 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("Monitoring stopped.")
+        running = False  # Set the flag to stop all threads
