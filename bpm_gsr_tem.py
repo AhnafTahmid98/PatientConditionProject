@@ -167,16 +167,15 @@ def update_display():
             # Display BPM and Value
             draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
             
-            # Draw BPM Graph, scaled to fit the smaller height
+            # Draw BPM Graph directly beside BPM value
             if bpm_history:
                 max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
                 min_bpm = min(bpm_history)
-                graph_height = 8  # Shorter height
+                graph_height = 8
                 graph_width = 60
                 x_start = 50
                 y_start = 0
 
-                # Draw graph with points for compactness
                 for i in range(1, len(bpm_history)):
                     y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
                     y2 = y_start + graph_height - int((bpm_history[i] - min_bpm) / (max_bpm - min_bpm) * graph_height)
@@ -184,8 +183,8 @@ def update_display():
                     x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
                     draw.line((x1, y1, x2, y2), fill=255, width=1)
 
-            # Display Temperature on the second row and Stress Level below it
-            draw.text((0, 18), f"Temp: {temperature_value:.1f}C", font=font, fill=255)
+            # Display Temperature in the middle row and Stress Level at the bottom
+            draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
             draw.text((0, 24), f"Stress: {stress_level}", font=font, fill=255)
 
             # Update OLED display
