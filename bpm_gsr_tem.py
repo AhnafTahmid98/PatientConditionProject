@@ -105,7 +105,7 @@ def monitor_gsr():
                     print(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
             else:
                 with data_lock:
-                    stress_level = "No contact"
+                    stress_level = "N/A"
             time.sleep(3)
 
         except OSError:
@@ -184,8 +184,9 @@ def update_display():
                     x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
                     draw.line((x1, y1, x2, y2), fill=255, width=1)
 
-            # Display Temperature and Stress Level in a single row below
-            draw.text((0, 18), f"Temp: {temperature_value:.1f}C  Stress: {stress_level}", font=font, fill=255)
+            # Display Temperature on the second row and Stress Level below it
+            draw.text((0, 18), f"Temp: {temperature_value:.1f}C", font=font, fill=255)
+            draw.text((0, 24), f"Stress: {stress_level}", font=font, fill=255)
 
             # Update OLED display
             oled.image(image)
