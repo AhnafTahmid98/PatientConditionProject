@@ -45,46 +45,58 @@ relaxed_threshold = baseline_value * 0.9
 normal_threshold = baseline_value * 1.1
 elevated_threshold = baseline_value * 1.3
 
-# Heart rate and temperature thresholds for alert levels
+# Heart rate thresholds and variables
 high_threshold = 2.5
 low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
 bpm_history = []  # For storing recent BPM values for graphing
 
-normal_bpm_range = (60, 100)  # Normal BPM range for adults
+# BPM thresholds for status levels
+normal_bpm_range = (60, 100)
+warning_bpm_range = (50, 120)
 
-# Functions to control LEDs and buzzer
-def set_leds_and_buzzer(state):
-    GPIO.output(green_led, GPIO.HIGH if state == "Normal" else GPIO.LOW)
-    GPIO.output(yellow_led, GPIO.HIGH if state == "Warning" else GPIO.LOW)
-    GPIO.output(red_led, GPIO.HIGH if state == "Critical" else GPIO.LOW)
-    GPIO.output(buzzer_pin, GPIO.HIGH if state == "Critical" else GPIO.LOW)
+# Function to set LED and buzzer based on status
+def set_leds_and_buzzer(status):
+    GPIO.output(green_led, GPIO.HIGH if status == "Normal" else GPIO.LOW)
+    GPIO.output(yellow_led, GPIO.HIGH if status == "Warning" else GPIO.LOW)
+    GPIO.output(red_led, GPIO.HIGH if status == "Critical" else GPIO.LOW)
+    GPIO.output(buzzer_pin, GPIO.HIGH if status == "Critical" else GPIO.LOW)
 
-# GSR Functions
+# Update status based on BPM, GSR, and Temperature
+def update_status():
+    global status
+    if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 38:
+        status = "Critical"
+    elif (50 <= bpm_value < 60 or 100 < bpm_value <= 120) or stress_level == "Elevated" or temperature_value > 37:
+        status = "Warning"
+    else:
+        status = "Normal"
+    set_leds_and_buzzer(status)
+
+# GSR Monitoring
 def read_gsr():
     chan_gsr = AnalogIn(adc, 1)
     return chan_gsr.value
 
-def determine_stress_level(value):
-    if value < relaxed_threshold:
+def determine_stress_level(gsr_value):
+    if gsr_value < relaxed_threshold:
         return "Normal"
-    elif value < normal_threshold:
+    elif gsr_value < normal_threshold:
         return "Normal"
-    elif value < elevated_threshold:
+    elif gsr_value < elevated_threshold:
         return "Elevated"
     else:
         return "High"
 
-# Monitor GSR
 def monitor_gsr():
-    global stress_level, status
+    global stress_level
     while running:
         try:
             gsr_value = read_gsr()
             stress_level = determine_stress_level(gsr_value)
             with data_lock:
-                print(f"Stress Level: {stress_level} | GSR Value: {gsr_value}")
+                print(f"GSR Value: {gsr_value}, Stress Level: {stress_level}")
             update_status()
             time.sleep(3)
         except OSError:
@@ -115,61 +127,75 @@ def monitor_heart_rate():
                     if len(bpm_history) > 20:  # Limit history length
                         bpm_history.pop(0)
                     print(f"Heart Rate: {bpm_value:.2f} BPM")
+                
+                # Update status based on the new BPM value
+                update_status()
             time.sleep(0.1)
         except OSError:
             print("Heart Rate error, reinitializing...")
             time.sleep(1)
 
-# Monitor Temperature
+# Temperature Monitoring Functions
+HUMAN_TEMP_RANGE = (35.8, 38.0)
+HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
+MAX_ATTEMPTS = 3
+
+def get_stable_temperature(sensor, readings=20):
+    temp_sum = 0
+    for _ in range(readings):
+        temp_sum += sensor.object_temperature
+        time.sleep(0.02)
+    return temp_sum / readings
+
+def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
+    return ambient_temp + offset
+
 def monitor_temperature():
-    global temperature_value
+    global temperature_value, HUMAN_TEMP_THRESHOLD_OFFSET
+    no_detection_count = 0
     while running:
-        try:
-            temperature_value = mlx.object_temperature
+        object_temp = get_stable_temperature(mlx)
+        dynamic_threshold = get_dynamic_threshold(mlx.ambient_temperature)
+
+        if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
+            temperature_value = object_temp
             with data_lock:
-                print(f"Temperature: {temperature_value:.2f}°C")
-            update_status()
-            time.sleep(1)
-        except OSError:
-            print("Temperature error, reinitializing...")
-            time.sleep(1)
+                print(f"Human Body Temperature: {temperature_value:.2f}°C")
+            no_detection_count = 0
+        else:
+            no_detection_count += 1
+            with data_lock:
+                temperature_value = 0
+                print("No human body detected.")
 
-# Determine overall status based on BPM, GSR, and Temperature
-def update_status():
-    global status
-    if bpm_value < normal_bpm_range[0] or bpm_value > normal_bpm_range[1] or \
-       stress_level == "High" or temperature_value > 38:
-        status = "Critical"
-    elif stress_level == "Elevated" or temperature_value > 37:
-        status = "Warning"
-    else:
-        status = "Normal"
-    set_leds_and_buzzer(status)
+        if no_detection_count >= MAX_ATTEMPTS:
+            HUMAN_TEMP_THRESHOLD_OFFSET += 0.1
+            no_detection_count = 0
+        time.sleep(1)
 
-# OLED Display Thread
+# OLED Display Thread with Compact Layout for 128x32 Display
 def update_display():
-    font = ImageFont.load_default()
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)  # Compact font
+    except IOError:
+        font = ImageFont.load_default()
+    
     while running:
         with data_lock:
+            # Create a blank image for drawing
             image = Image.new("1", (128, 32))
             draw = ImageDraw.Draw(image)
             
-            # Display BPM
+            # Display BPM and Value
             draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
             
-            # Display Temperature
-            draw.text((0, 12), f"Temp: {temperature_value:.1f}°C", font=font, fill=255)
-            
-            # Display Stress Level
-            draw.text((0, 24), f"Stress: {stress_level}", font=font, fill=255)
-            
-            # Draw BPM history graph if available
+            # Draw BPM Graph directly beside BPM value
             if bpm_history:
                 max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
                 min_bpm = min(bpm_history)
                 graph_height = 8
                 graph_width = 60
-                x_start = 70
+                x_start = 50
                 y_start = 0
 
                 for i in range(1, len(bpm_history)):
@@ -179,8 +205,15 @@ def update_display():
                     x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
                     draw.line((x1, y1, x2, y2), fill=255, width=1)
 
+            # Display Temperature in the middle row and Stress Level at the bottom
+            draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
+            draw.text((0, 24), f"Stress: {stress_level}", font=font, fill=255)
+
+            # Update OLED display
             oled.image(image)
             oled.show()
+        
+        # Refresh to avoid blur
         time.sleep(1.5)
 
 # Main function
