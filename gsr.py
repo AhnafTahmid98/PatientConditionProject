@@ -9,17 +9,17 @@ from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
 
 # LED and buzzer pin definitions
-green_led = 17  # GPIO 17
-yellow_led = 27  # GPIO 27
-red_led = 22  # GPIO 22
-buzzer_pin = 23  # GPIO 23
+GREEN_LED = 17  # GPIO 17
+YELLOW_LED = 27  # GPIO 27
+RED_LED = 22  # GPIO 22
+BUZZER_PIN = 23  # GPIO 23
 
 # GPIO setup for LEDs and buzzer
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(green_led, GPIO.OUT)
-GPIO.setup(yellow_led, GPIO.OUT)
-GPIO.setup(red_led, GPIO.OUT)
-GPIO.setup(buzzer_pin, GPIO.OUT)
+GPIO.setup(GREEN_LED, GPIO.OUT)
+GPIO.setup(YELLOW_LED, GPIO.OUT)
+GPIO.setup(RED_LED, GPIO.OUT)
+GPIO.setup(BUZZER_PIN, GPIO.OUT)
 
 # Initialize I2C bus and ADC
 i2c = busio.I2C(board.SCL, board.SDA)
@@ -31,50 +31,58 @@ oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
 
 # Shared variables
 stress_level = "None"
+human_interaction = False
 
-# Thresholds for GSR
-baseline_value = 11000
-relaxed_threshold = baseline_value * 0.9
-normal_threshold = baseline_value * 1.1
-elevated_threshold = baseline_value * 1.3
+# Thresholds for GSR (assuming a baseline GSR reading)
+BASELINE_VALUE = 11000
+RELAXED_THRESHOLD = BASELINE_VALUE * 0.9
+NORMAL_THRESHOLD = BASELINE_VALUE * 1.1
+ELEVATED_THRESHOLD = BASELINE_VALUE * 1.3
 
-# Function to set LED and buzzer based on stress level
-def set_leds_and_buzzer(stress):
-    GPIO.output(green_led, GPIO.HIGH if stress == "Normal" else GPIO.LOW)
-    GPIO.output(yellow_led, GPIO.HIGH if stress == "Elevated" else GPIO.LOW)
-    GPIO.output(red_led, GPIO.HIGH if stress == "High" else GPIO.LOW)
-    GPIO.output(buzzer_pin, GPIO.HIGH if stress == "High" else GPIO.LOW)
+# Function to control LEDs and buzzer based on stress level and interaction status
+def set_leds_and_buzzer(stress, interaction):
+    GPIO.output(GREEN_LED, GPIO.HIGH if stress == "Normal" else GPIO.LOW)
+    GPIO.output(YELLOW_LED, GPIO.HIGH if stress == "Elevated" else GPIO.LOW)
+    GPIO.output(RED_LED, GPIO.HIGH if stress == "High" and interaction else GPIO.LOW)
+    GPIO.output(BUZZER_PIN, GPIO.HIGH if stress == "High" and interaction else GPIO.LOW)
 
-# Function to determine stress level based on GSR reading
+# Function to assess stress level based on GSR value
 def determine_stress_level(gsr_value):
-    if gsr_value < relaxed_threshold:
-        return "Normal"
-    elif gsr_value < normal_threshold:
-        return "Normal"
-    elif gsr_value < elevated_threshold:
-        return "Elevated"
+    global human_interaction
+    if gsr_value < 13000:  # Indicate human interaction
+        human_interaction = True
+        if gsr_value < RELAXED_THRESHOLD:
+            return "Normal"
+        elif gsr_value < NORMAL_THRESHOLD:
+            return "Normal"
+        elif gsr_value < ELEVATED_THRESHOLD:
+            return "Elevated"
+        else:
+            return "High"
     else:
-        return "High"
+        human_interaction = False
+        return "No contact"
 
-# GSR Monitoring
+# Function to read GSR value from the sensor
 def read_gsr():
     chan_gsr = AnalogIn(adc, 1)
     return chan_gsr.value
 
+# GSR monitoring function to update stress level and control LEDs and buzzer
 def monitor_gsr():
     global stress_level
     while True:
         try:
             gsr_value = read_gsr()
             stress_level = determine_stress_level(gsr_value)
-            set_leds_and_buzzer(stress_level)  # Update LEDs and buzzer based on stress level
-            print(f"GSR Value: {gsr_value}, Stress Level: {stress_level}")
+            set_leds_and_buzzer(stress_level, human_interaction)
+            print(f"GSR Value: {gsr_value}, Stress Level: {stress_level}, Interaction: {human_interaction}")
             time.sleep(3)
         except OSError:
             print("GSR error, reinitializing...")
             time.sleep(1)
 
-# OLED Display Thread
+# OLED display function to show stress level and interaction status
 def update_display():
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)
@@ -86,8 +94,9 @@ def update_display():
         image = Image.new("1", (128, 32))
         draw = ImageDraw.Draw(image)
         
-        # Display Stress Level
+        # Display Stress Level and Interaction Status
         draw.text((0, 0), f"Stress: {stress_level}", font=font, fill=255)
+        draw.text((0, 16), f"Interaction: {'Yes' if human_interaction else 'No'}", font=font, fill=255)
 
         # Update OLED display
         oled.image(image)
@@ -95,7 +104,7 @@ def update_display():
         
         time.sleep(1.5)
 
-# Main function
+# Main function to run monitoring and display threads
 if __name__ == "__main__":
     try:
         # Start threads for monitoring GSR and updating the display
