@@ -21,6 +21,7 @@ oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3c)
 bpm_value = 0
 temperature_value = 0
 stress_level = "None"
+bpm_history = []  # To store recent BPM values for graph
 
 # Lock for synchronizing display updates
 data_lock = threading.Lock()
@@ -62,7 +63,7 @@ last_pulse_time = 0
 first_pulse = True
 
 def monitor_heart_rate():
-    global adc, bpm_value, last_pulse_time, first_pulse
+    global adc, bpm_value, last_pulse_time, first_pulse, bpm_history
     while running:
         try:
             chan_heart_rate = AnalogIn(adc, 0)
@@ -75,7 +76,13 @@ def monitor_heart_rate():
                 pulse_interval = (time.time() - last_pulse_time) * 1000  # ms
                 last_pulse_time = time.time()
                 bpm_value = 60000 / pulse_interval
+
+                # Add bpm_value to bpm_history for graphing, keeping the list length fixed
                 with data_lock:
+                    bpm_history.append(bpm_value)
+                    if len(bpm_history) > 20:  # Maintain a max history length of 20 for graph
+                        bpm_history.pop(0)
+                    
                     print(f"Heart Rate: {bpm_value:.2f} BPM")
             time.sleep(0.1)
 
@@ -144,7 +151,7 @@ def monitor_temperature():
             no_detection_count = 0
         time.sleep(1)
 
-# OLED Display Thread with Simple Font
+# OLED Display Thread with Simple Font and Graph
 def update_display():
     # Use DejaVu Sans for better readability
     try:
@@ -158,11 +165,27 @@ def update_display():
             image = Image.new("1", (128, 64))
             draw = ImageDraw.Draw(image)
             
-            # Display BPM, Temperature, and Stress Level with adjusted spacing for clarity
-            draw.text((0, 0), f"BPM: {bpm_value:.2f}", font=font, fill=255)
+            # Display BPM, Temperature, and Stress Level
+            draw.text((0, 0), f"BPM:", font=font, fill=255)
             draw.text((0, 22), f"Temp: {temperature_value:.2f}C", font=font, fill=255)
             draw.text((0, 44), f"Stress: {stress_level}", font=font, fill=255)
             
+            # Draw BPM Graph
+            if bpm_history:
+                max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
+                min_bpm = min(bpm_history)
+                graph_height = 20
+                graph_width = 60
+                x_start = 68
+                y_start = 0
+                for i, bpm in enumerate(bpm_history):
+                    if max_bpm != min_bpm:
+                        y = y_start + graph_height - int((bpm - min_bpm) / (max_bpm - min_bpm) * graph_height)
+                    else:
+                        y = y_start + graph_height // 2
+                    x = x_start + i * (graph_width // len(bpm_history))
+                    draw.point((x, y), fill=255)
+
             # Update OLED display
             oled.image(image)
             oled.show()
