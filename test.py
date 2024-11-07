@@ -22,6 +22,12 @@ GPIO.setup(YELLOW_LED, GPIO.OUT)
 GPIO.setup(RED_LED, GPIO.OUT)
 GPIO.setup(BUZZER_PIN, GPIO.OUT)
 
+# Initialize LEDs and buzzer to OFF
+GPIO.output(GREEN_LED, GPIO.LOW)
+GPIO.output(YELLOW_LED, GPIO.LOW)
+GPIO.output(RED_LED, GPIO.LOW)
+GPIO.output(BUZZER_PIN, GPIO.LOW)
+
 # Initialize I2C bus and sensors
 i2c = busio.I2C(board.SCL, board.SDA)
 adc = ADS1115(i2c, address=0x48)
@@ -57,12 +63,34 @@ bpm_history = []  # For storing recent BPM values for graphing
 normal_bpm_range = (60, 100)
 warning_bpm_range = (50, 120)
 
-# Function to control LEDs and buzzer based on stress level and interaction status
-def set_leds_and_buzzer(stress, interaction):
-    GPIO.output(GREEN_LED, GPIO.HIGH if stress == "Normal" else GPIO.LOW)
-    GPIO.output(YELLOW_LED, GPIO.HIGH if stress == "Elevated" else GPIO.LOW)
-    GPIO.output(RED_LED, GPIO.HIGH if stress == "High" and interaction else GPIO.LOW)
-    GPIO.output(BUZZER_PIN, GPIO.HIGH if stress == "High" and interaction else GPIO.LOW)
+# Thresholds & Variables for Temperature
+HUMAN_TEMP_RANGE = (35.8, 38.0)
+HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
+MAX_ATTEMPTS = 3
+
+
+# Function to control LEDs and buzzer based on status and interaction status
+def set_leds_and_buzzer(status, interaction):
+    if status == "Normal":
+        GPIO.output(GREEN_LED, GPIO.HIGH)
+        GPIO.output(YELLOW_LED, GPIO.LOW)
+        GPIO.output(RED_LED, GPIO.LOW)
+        GPIO.output(BUZZER_PIN, GPIO.LOW)
+    elif status == "Warning":
+        GPIO.output(GREEN_LED, GPIO.LOW)
+        GPIO.output(YELLOW_LED, GPIO.HIGH)
+        GPIO.output(RED_LED, GPIO.LOW)
+        GPIO.output(BUZZER_PIN, GPIO.LOW)
+    elif status == "Critical" and interaction:
+        GPIO.output(GREEN_LED, GPIO.LOW)
+        GPIO.output(YELLOW_LED, GPIO.LOW)
+        GPIO.output(RED_LED, GPIO.HIGH)
+        GPIO.output(BUZZER_PIN, GPIO.HIGH)
+    else:
+        GPIO.output(GREEN_LED, GPIO.LOW)
+        GPIO.output(YELLOW_LED, GPIO.LOW)
+        GPIO.output(RED_LED, GPIO.LOW)
+        GPIO.output(BUZZER_PIN, GPIO.LOW)
 
 # Update status based on BPM, GSR, and Temperature
 def update_status():
@@ -73,7 +101,7 @@ def update_status():
         status = "Warning"
     else:
         status = "Normal"
-    set_leds_and_buzzer(stress_level, human_interaction)
+    set_leds_and_buzzer(status, human_interaction)
 
 # GSR Monitoring
 def read_gsr():
@@ -119,7 +147,6 @@ def monitor_heart_rate():
             voltage = chan_heart_rate.voltage
             current_time = time.time()
             
-            # Detecting the pulse
             if voltage > high_threshold and first_pulse:
                 last_pulse_time = current_time
                 first_pulse = False
@@ -128,25 +155,19 @@ def monitor_heart_rate():
                 bpm_value = 60000 / pulse_interval
                 last_pulse_time = current_time
 
-                # Update BPM history for graphing
                 with data_lock:
                     bpm_history.append(bpm_value)
                     if len(bpm_history) > 20:  # Limit history length
                         bpm_history.pop(0)
                     print(f"Heart Rate: {bpm_value:.2f} BPM")
                 
-                # Update status based on the new BPM value
                 update_status()
             time.sleep(0.1)
         except OSError:
             print("Heart Rate error, reinitializing...")
             time.sleep(1)
 
-# Temperature Monitoring Functions
-HUMAN_TEMP_RANGE = (35.8, 38.0)
-HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
-MAX_ATTEMPTS = 3
-
+# Temperature Monitoring 
 def get_stable_temperature(sensor, readings=20):
     temp_sum = 0
     for _ in range(readings):
@@ -189,21 +210,17 @@ def update_display():
     
     while running:
         with data_lock:
-            # Create a blank image for drawing
             image = Image.new("1", (128, 32))
             draw = ImageDraw.Draw(image)
-            
-            # Display BPM and Value
             draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
             
-            # Draw BPM Graph directly beside BPM value
             if bpm_history:
                 max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
                 min_bpm = min(bpm_history)
                 graph_height = 8
                 graph_width = 60
                 x_start = 50
-                y_start = 2  # Moved up slightly for spacing
+                y_start = 2
 
                 for i in range(1, len(bpm_history)):
                     y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
@@ -212,21 +229,17 @@ def update_display():
                     x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
                     draw.line((x1, y1, x2, y2), fill=255, width=1)
 
-            # Display Temperature in the middle row and Stress Level at a higher bottom row
             draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
-            draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)  # Adjusted to 22 for better spacing
+            draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
 
-            # Update OLED display
             oled.image(image)
             oled.show()
         
-        # Refresh to avoid blur
         time.sleep(1.5)
 
 # Main function
 if __name__ == "__main__":
     try:
-        # Start threads for monitoring and displaying data
         gsr_thread = threading.Thread(target=monitor_gsr)
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
         temperature_thread = threading.Thread(target=monitor_temperature)
