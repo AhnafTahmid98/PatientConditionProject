@@ -144,11 +144,10 @@ def monitor_temperature():
             no_detection_count = 0
         time.sleep(1)
 
-# OLED Display Thread with Arial Font
+# OLED Display Thread with Adjusted Font and Spacing
 def update_display():
-    # Load Arial font at a suitable size
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf", 14)  # or Verdana.ttf
+        font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf", 16)  # Arial, size 16
     except IOError:
         font = ImageFont.load_default()
     
@@ -158,15 +157,17 @@ def update_display():
             image = Image.new("1", (128, 64))
             draw = ImageDraw.Draw(image)
             
-            # Display BPM, Temperature, and Stress Level
+            # Display BPM, Temperature, and Stress Level with adjusted spacing for clarity
             draw.text((0, 0), f"BPM: {bpm_value:.2f}", font=font, fill=255)
-            draw.text((0, 20), f"Temperature: {temperature_value:.2f}C", font=font, fill=255)
-            draw.text((0, 40), f"Stress: {stress_level}", font=font, fill=255)
+            draw.text((0, 22), f"Temp: {temperature_value:.2f}C", font=font, fill=255)
+            draw.text((0, 44), f"Stress: {stress_level}", font=font, fill=255)
             
             # Update OLED display
             oled.image(image)
             oled.show()
-        time.sleep(1)
+        
+        # Refresh less frequently to avoid blur
+        time.sleep(1.5)
 
 # Main function to start all threads
 if __name__ == "__main__":
