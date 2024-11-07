@@ -203,7 +203,7 @@ def update_display():
                 graph_height = 8
                 graph_width = 60
                 x_start = 50
-                y_start = 0
+                y_start = 2  # Moved up slightly for spacing
 
                 for i in range(1, len(bpm_history)):
                     y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
@@ -212,9 +212,9 @@ def update_display():
                     x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
                     draw.line((x1, y1, x2, y2), fill=255, width=1)
 
-            # Display Temperature in the middle row and Stress Level at the bottom
+            # Display Temperature in the middle row and Stress Level at a higher bottom row
             draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
-            draw.text((0, 24), f"Stress: {stress_level}", font=font, fill=255)
+            draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)  # Adjusted to 22 for better spacing
 
             # Update OLED display
             oled.image(image)
