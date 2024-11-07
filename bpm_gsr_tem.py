@@ -4,17 +4,26 @@ import busio
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_mlx90614
+import adafruit_ssd1306
 import threading
+from PIL import Image, ImageDraw, ImageFont
 
 # Initialize I2C bus
 i2c = busio.I2C(board.SCL, board.SDA)
 
-# Initialize ADS1115 ADC at address 0x48
+# Initialize ADC, Temperature Sensor, and OLED
 adc = ADS1115(i2c, address=0x48)
 adc.gain = 1
-
-# Initialize MLX90614 Temperature Sensor at address 0x5a
 mlx = adafruit_mlx90614.MLX90614(i2c, address=0x5a)
+oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3c)
+
+# Shared variables for display
+bpm_value = 0
+temperature_value = 0
+stress_level = "None"
+
+# Lock for synchronizing display updates
+data_lock = threading.Lock()
 
 # Settings for GSR
 window_size = 10
@@ -52,32 +61,32 @@ last_pulse_time = 0
 first_pulse = True
 
 def monitor_heart_rate():
-    global adc, last_pulse_time, first_pulse
+    global bpm_value, last_pulse_time, first_pulse
     while True:
         try:
             chan_heart_rate = AnalogIn(adc, 0)
             voltage = chan_heart_rate.voltage
             if voltage > high_threshold and first_pulse:
-                print("Pulse detected (first pulse)")
                 last_pulse_time = time.time()
                 first_pulse = False
 
             elif voltage > high_threshold and time.time() - last_pulse_time > 0.4:
                 pulse_interval = (time.time() - last_pulse_time) * 1000  # ms
                 last_pulse_time = time.time()
-                bpm = 60000 / pulse_interval
-                print(f"Heart Rate: {bpm:.2f} BPM")
-
+                bpm_value = 60000 / pulse_interval
+                with data_lock:
+                    print(f"Heart Rate: {bpm_value:.2f} BPM")
             time.sleep(0.1)
 
-        except OSError as e:
+        except OSError:
             print("I2C communication error in heart rate monitoring. Reinitializing ADS1115...")
-            adc = ADS1115(i2c, address=0x48)  # Reinitialize the I2C device
+            global adc
+            adc = ADS1115(i2c, address=0x48)
             time.sleep(1)
 
 # GSR Monitoring Thread
 def monitor_gsr():
-    global adc
+    global stress_level
     while True:
         try:
             gsr_value = read_gsr()
@@ -85,14 +94,17 @@ def monitor_gsr():
             if smoothed_value < 13000:
                 contact_status = "Contact with human detected"
                 stress_level = determine_stress_level(smoothed_value)
-                print(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
+                with data_lock:
+                    print(f"{contact_status} | Stress Level: {stress_level} | Smoothed GSR Value: {smoothed_value}")
             else:
-                print("No contact detected")
+                with data_lock:
+                    stress_level = "No contact"
             time.sleep(3)
 
-        except OSError as e:
+        except OSError:
             print("I2C communication error in GSR monitoring. Reinitializing ADS1115...")
-            adc = ADS1115(i2c, address=0x48)  # Reinitialize the I2C device
+            global adc
+            adc = ADS1115(i2c, address=0x48)
             time.sleep(1)
 
 # Temperature Monitoring Functions
@@ -111,25 +123,40 @@ def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
     return ambient_temp + offset
 
 def monitor_temperature():
-    global HUMAN_TEMP_THRESHOLD_OFFSET
+    global temperature_value, HUMAN_TEMP_THRESHOLD_OFFSET
     no_detection_count = 0
     while True:
         object_temp = get_stable_temperature(mlx)
         dynamic_threshold = get_dynamic_threshold(mlx.ambient_temperature)
 
         if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
-            print("Human body detected.")
-            print("Human Body Temperature: {:.2f}°C".format(object_temp))
+            temperature_value = object_temp
+            with data_lock:
+                print(f"Human Body Temperature: {temperature_value:.2f}°C")
             no_detection_count = 0
         else:
             no_detection_count += 1
-            print("No human body detected.")
+            with data_lock:
+                temperature_value = 0
+                print("No human body detected.")
 
         if no_detection_count >= MAX_ATTEMPTS:
             HUMAN_TEMP_THRESHOLD_OFFSET += 0.1
-            print(f"Increasing detection offset to {HUMAN_TEMP_THRESHOLD_OFFSET:.1f}°C")
             no_detection_count = 0
+        time.sleep(1)
 
+# OLED Display Thread
+def update_display():
+    font = ImageFont.load_default()
+    while True:
+        with data_lock:
+            image = Image.new("1", (128, 64))
+            draw = ImageDraw.Draw(image)
+            draw.text((0, 0), f"BPM: {bpm_value:.2f}", font=font, fill=255)
+            draw.text((0, 20), f"Temperature: {temperature_value:.2f}C", font=font, fill=255)
+            draw.text((0, 40), f"Stress: {stress_level}", font=font, fill=255)
+            oled.image(image)
+            oled.show()
         time.sleep(1)
 
 # Main function to start all threads
@@ -138,14 +165,17 @@ if __name__ == "__main__":
         gsr_thread = threading.Thread(target=monitor_gsr)
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
         temperature_thread = threading.Thread(target=monitor_temperature)
+        display_thread = threading.Thread(target=update_display)
 
         gsr_thread.start()
         heart_rate_thread.start()
         temperature_thread.start()
+        display_thread.start()
 
         gsr_thread.join()
         heart_rate_thread.join()
         temperature_thread.join()
+        display_thread.join()
 
     except KeyboardInterrupt:
         print("Monitoring stopped.")
