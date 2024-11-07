@@ -52,7 +52,7 @@ last_pulse_time = 0
 first_pulse = True
 
 def monitor_heart_rate():
-    global last_pulse_time, first_pulse
+    global adc, last_pulse_time, first_pulse
     while True:
         try:
             chan_heart_rate = AnalogIn(adc, 0)
@@ -72,12 +72,12 @@ def monitor_heart_rate():
 
         except OSError as e:
             print("I2C communication error in heart rate monitoring. Reinitializing ADS1115...")
-            global adc
             adc = ADS1115(i2c, address=0x48)  # Reinitialize the I2C device
             time.sleep(1)
 
 # GSR Monitoring Thread
 def monitor_gsr():
+    global adc
     while True:
         try:
             gsr_value = read_gsr()
@@ -92,7 +92,6 @@ def monitor_gsr():
 
         except OSError as e:
             print("I2C communication error in GSR monitoring. Reinitializing ADS1115...")
-            global adc
             adc = ADS1115(i2c, address=0x48)  # Reinitialize the I2C device
             time.sleep(1)
 
