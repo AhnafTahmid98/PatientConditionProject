@@ -12,7 +12,7 @@ try:
     # Turn the buzzer on and off in a loop
     while True:
         GPIO.output(buzzer_pin, GPIO.HIGH)  # Activate the buzzer
-        time.sleep(0.5)                     # Buzzer on for 0.5 seconds
+        time.sleep(0.3)                     # Buzzer on for 0.5 seconds
         GPIO.output(buzzer_pin, GPIO.LOW)   # Deactivate the buzzer
         time.sleep(0.5)                     # Buzzer off for 0.5 seconds
 
