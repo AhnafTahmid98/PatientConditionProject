@@ -61,7 +61,7 @@ last_pulse_time = 0
 first_pulse = True
 
 def monitor_heart_rate():
-    global adc, last_pulse_time, first_pulse
+    global adc, bpm_value, last_pulse_time, first_pulse
     while True:
         try:
             chan_heart_rate = AnalogIn(adc, 0)
@@ -143,16 +143,26 @@ def monitor_temperature():
             no_detection_count = 0
         time.sleep(1)
 
-# OLED Display Thread
+# OLED Display Thread with Larger Font
 def update_display():
-    font = ImageFont.load_default()
+    # Load a larger font (adjust the size as necessary)
+    try:
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+    except IOError:
+        font = ImageFont.load_default()
+    
     while True:
         with data_lock:
+            # Create a blank image for drawing with larger font
             image = Image.new("1", (128, 64))
             draw = ImageDraw.Draw(image)
+            
+            # Display BPM, Temperature, and Stress Level
             draw.text((0, 0), f"BPM: {bpm_value:.2f}", font=font, fill=255)
             draw.text((0, 20), f"Temperature: {temperature_value:.2f}C", font=font, fill=255)
             draw.text((0, 40), f"Stress: {stress_level}", font=font, fill=255)
+            
+            # Update OLED display
             oled.image(image)
             oled.show()
         time.sleep(1)
