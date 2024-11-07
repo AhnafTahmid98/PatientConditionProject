@@ -144,11 +144,11 @@ def monitor_temperature():
             no_detection_count = 0
         time.sleep(1)
 
-# OLED Display Thread with Larger Font
+# OLED Display Thread with Arial Font
 def update_display():
-    # Load a larger font (adjust the size as necessary)
+    # Load Arial font at a suitable size
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Calibri.ttf", 16)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial.ttf", 14)  # or Verdana.ttf
     except IOError:
         font = ImageFont.load_default()
     
