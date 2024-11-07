@@ -15,7 +15,7 @@ i2c = busio.I2C(board.SCL, board.SDA)
 adc = ADS1115(i2c, address=0x48)
 adc.gain = 1
 mlx = adafruit_mlx90614.MLX90614(i2c, address=0x5a)
-oled = adafruit_ssd1306.SSD1306_I2C(128, 64, i2c, addr=0x3c)
+oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)  # Updated for 128x32 resolution
 
 # Shared variables for display
 bpm_value = 0
@@ -151,50 +151,47 @@ def monitor_temperature():
             no_detection_count = 0
         time.sleep(1)
 
-# OLED Display Thread with Simple Font and Graph
+# OLED Display Thread with Compact Layout for 128x32 Display
 def update_display():
-    # Use DejaVu Sans with font size 10 for better readability and spacing
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 10)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)  # Compact font
     except IOError:
         font = ImageFont.load_default()
     
     while running:
         with data_lock:
-            # Create a blank image for drawing with smaller font
-            image = Image.new("1", (128, 64))
+            # Create a blank image for drawing
+            image = Image.new("1", (128, 32))
             draw = ImageDraw.Draw(image)
             
-            # Display BPM with actual value, Temperature, and Stress Level with adjusted spacing
-            draw.text((0, 0), f"BPM: {bpm_value:.2f}", font=font, fill=255)
+            # Display BPM and Value
+            draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
             
-            # Draw BPM Graph with thicker lines for better clarity
+            # Draw BPM Graph, scaled to fit the smaller height
             if bpm_history:
                 max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
                 min_bpm = min(bpm_history)
-                graph_height = 10
+                graph_height = 8  # Shorter height
                 graph_width = 60
-                x_start = 0
-                y_start = 12
+                x_start = 50
+                y_start = 0
 
-                # Draw graph as thicker lines for clarity
+                # Draw graph with points for compactness
                 for i in range(1, len(bpm_history)):
-                    # Scale y-values to fit within the graph height
                     y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
                     y2 = y_start + graph_height - int((bpm_history[i] - min_bpm) / (max_bpm - min_bpm) * graph_height)
                     x1 = x_start + (i - 1) * (graph_width // (len(bpm_history) - 1))
                     x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
-                    draw.line((x1, y1, x2, y2), fill=255, width=2)
+                    draw.line((x1, y1, x2, y2), fill=255, width=1)
 
-            # Display Temperature and Stress Level
-            draw.text((0, 24), f"Temp.: {temperature_value:.2f}C", font=font, fill=255)
-            draw.text((0, 44), f"Stress: {stress_level}", font=font, fill=255)
+            # Display Temperature and Stress Level in a single row below
+            draw.text((0, 18), f"Temp: {temperature_value:.1f}C  Stress: {stress_level}", font=font, fill=255)
 
             # Update OLED display
             oled.image(image)
             oled.show()
         
-        # Refresh less frequently to avoid blur
+        # Refresh to avoid blur
         time.sleep(1.5)
 
 # Main function to start all threads
