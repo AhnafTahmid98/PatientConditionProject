@@ -147,7 +147,7 @@ def monitor_temperature():
 def update_display():
     # Load a larger font (adjust the size as necessary)
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf", 10)
     except IOError:
         font = ImageFont.load_default()
     
