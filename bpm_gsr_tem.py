@@ -48,7 +48,7 @@ def get_moving_average_gsr(value):
 
 def determine_stress_level(smoothed_value):
     if smoothed_value < relaxed_threshold:
-        return "Relaxed"
+        return "Normal"
     elif relaxed_threshold <= smoothed_value < normal_threshold:
         return "Normal"
     elif normal_threshold <= smoothed_value < elevated_threshold:
@@ -153,9 +153,9 @@ def monitor_temperature():
 
 # OLED Display Thread with Simple Font and Graph
 def update_display():
-    # Use DejaVu Sans with font size 12 for better readability and spacing
+    # Use DejaVu Sans with font size 10 for better readability and spacing
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 12)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 10)
     except IOError:
         font = ImageFont.load_default()
     
@@ -165,19 +165,17 @@ def update_display():
             image = Image.new("1", (128, 64))
             draw = ImageDraw.Draw(image)
             
-            # Display BPM, Temperature, and Stress Level with adjusted spacing
-            draw.text((0, 0), f"BPM:", font=font, fill=255)
-            draw.text((0, 20), f"Temp: {temperature_value:.2f}C", font=font, fill=255)
-            draw.text((0, 40), f"Stress: {stress_level}", font=font, fill=255)
+            # Display BPM with actual value, Temperature, and Stress Level with adjusted spacing
+            draw.text((0, 0), f"BPM: {bpm_value:.2f}", font=font, fill=255)
             
-            # Draw BPM Graph on the right side
+            # Draw BPM Graph
             if bpm_history:
                 max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
                 min_bpm = min(bpm_history)
-                graph_height = 20
+                graph_height = 10
                 graph_width = 60
-                x_start = 68
-                y_start = 0
+                x_start = 0
+                y_start = 12
                 for i, bpm in enumerate(bpm_history):
                     if max_bpm != min_bpm:
                         y = y_start + graph_height - int((bpm - min_bpm) / (max_bpm - min_bpm) * graph_height)
@@ -185,6 +183,10 @@ def update_display():
                         y = y_start + graph_height // 2
                     x = x_start + i * (graph_width // len(bpm_history))
                     draw.point((x, y), fill=255)
+
+            # Display Temperature and Stress Level
+            draw.text((0, 24), f"Temp.: {temperature_value:.2f}C", font=font, fill=255)
+            draw.text((0, 44), f"Stress: {stress_level}", font=font, fill=255)
 
             # Update OLED display
             oled.image(image)
