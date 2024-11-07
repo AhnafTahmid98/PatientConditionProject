@@ -11,8 +11,8 @@ mlx = adafruit_mlx90614.MLX90614(i2c)
 
 # Human temperature range and offset
 HUMAN_TEMP_RANGE = (35.8, 38.0)
-HUMAN_TEMP_THRESHOLD_OFFSET = 2.5  # Starting offset for human detection
-MAX_ATTEMPTS = 5  # Number of failed attempts before increasing offset
+HUMAN_TEMP_THRESHOLD_OFFSET = 3  # Starting offset for human detection
+MAX_ATTEMPTS = 3  # Number of failed attempts before increasing offset
 
 # Function to get stable temperature readings with a weighted moving average
 def get_stable_temperature(sensor, readings=20):
