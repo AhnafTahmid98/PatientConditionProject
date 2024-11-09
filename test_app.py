@@ -150,6 +150,14 @@ def set_leds_and_buzzer(status, interaction):
         GPIO.output(RED_LED, GPIO.LOW)
         GPIO.output(BUZZER_PIN, GPIO.LOW)
 
+# Function to get a stable temperature reading by averaging multiple readings
+def get_stable_temperature(sensor, readings=20):
+    temp_sum = 0
+    for _ in range(readings):
+        temp_sum += sensor.object_temperature
+        time.sleep(0.02)  # Small delay between readings
+    return temp_sum / readings
+
 # Update status based on BPM, GSR, and Temperature, and check for human presence
 def update_status():
     global status, email_count, consecutive_warning_with_human, consecutive_critical_with_human
@@ -256,7 +264,7 @@ def monitor_temperature():
     no_detection_count = 0
     while running:
         try:
-            object_temp = get_stable_temperature(mlx)
+            object_temp = get_stable_temperature(mlx)  # Call the defined function
             dynamic_threshold = get_dynamic_threshold(mlx.ambient_temperature)
 
             if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
