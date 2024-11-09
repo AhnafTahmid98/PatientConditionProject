@@ -88,7 +88,7 @@ normal_bpm_range = (60, 100)
 warning_bpm_range = (50, 120)
 
 # Thresholds and Variables for Temperature
-HUMAN_TEMP_RANGE = (35.8, 38.0)
+HUMAN_TEMP_RANGE = (35.8, 40.0)
 HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
 MAX_ATTEMPTS = 3
 
@@ -157,11 +157,11 @@ def update_status():
     previous_status = status  # Keep track of previous status for comparison
 
     # Determine new status
-    if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 38:
+    if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 39:
         status = "Critical"
         consecutive_warning_count = 0  # Reset warning count if we're in critical
         consecutive_critical_count += 1  # Increase critical count
-    elif (50 <= bpm_value < 60 or 100 < bpm_value <= 120) or stress_level == "Elevated" or temperature_value > 37:
+    elif (50 <= bpm_value < 60 or 100 < bpm_value <= 120) or stress_level == "Elevated" or temperature_value > 37.8:
         status = "Warning"
         consecutive_critical_count = 0  # Reset critical count if we're in warning
         consecutive_warning_count += 1  # Increase warning count
