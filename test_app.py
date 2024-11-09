@@ -66,8 +66,8 @@ email_count = 0
 email_sent_display = False
 running = False  # Monitoring flag, controlled by commands from app
 
-# WebSocket command variable
-command_from_app = None
+# Global variable to store the monitoring task- websocket
+monitoring_task = None
 
 # Data lock
 data_lock = threading.Lock()
@@ -323,7 +323,7 @@ def update_display():
 
 # WebSocket Handler
 async def websocket_handler(websocket, _):  # `_` instead of `path` to indicate it's unused
-    global running
+    global running, monitoring_task
 
     async def send_data():
         while running:
@@ -340,14 +340,19 @@ async def websocket_handler(websocket, _):  # `_` instead of `path` to indicate 
         command = json.loads(message).get("command")
 
         if command == "START_MONITORING":
-            running = True
-            await websocket.send(json.dumps({"status": "Monitoring started"}))
-            # Start the data-sending task
-            asyncio.create_task(send_data())
+            if not running:
+                running = True
+                await websocket.send(json.dumps({"status": "Monitoring started"}))
+                # Start the data-sending task
+                monitoring_task = asyncio.create_task(send_data())
 
         elif command == "STOP_MONITORING":
-            running = False
-            await websocket.send(json.dumps({"status": "Monitoring stopped"}))
+            if running:
+                running = False
+                await websocket.send(json.dumps({"status": "Monitoring stopped"}))
+                if monitoring_task:
+                    monitoring_task.cancel()  # Cancel the existing task
+                    monitoring_task = None
             
 # Start WebSocket Server
 def start_websocket_server():
