@@ -33,6 +33,9 @@ YELLOW_LED = 27  # GPIO 27
 RED_LED = 22  # GPIO 22
 BUZZER_PIN = 23  # GPIO 23
 
+# Clean up GPIO before setting up
+GPIO.cleanup()
+
 # GPIO setup for LEDs and buzzer
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(GREEN_LED, GPIO.OUT)
@@ -326,11 +329,18 @@ async def websocket_handler(websocket, path):
         if command == "START_MONITORING":
             running = True
             await websocket.send(json.dumps({"status": "Monitoring started"}))
+            # Send initial data immediately after start
+            data = {
+                "bpm": bpm_value,
+                "temperature": temperature_value,
+                "stress_level": stress_level
+            }
+            await websocket.send(json.dumps(data))
         elif command == "STOP_MONITORING":
             running = False
             await websocket.send(json.dumps({"status": "Monitoring stopped"}))
 
-        # Send sensor data only when monitoring
+        # Send continuous data when monitoring
         while running:
             data = {
                 "bpm": bpm_value,
@@ -342,7 +352,11 @@ async def websocket_handler(websocket, path):
 
 # Start WebSocket Server
 def start_websocket_server():
-    asyncio.run(websockets.serve(websocket_handler, "0.0.0.0", 8765))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    server = websockets.serve(websocket_handler, "0.0.0.0", 8765)
+    loop.run_until_complete(server)
+    loop.run_forever()
 
 # Main function
 if __name__ == "__main__":
