@@ -321,39 +321,28 @@ def update_display():
 # WebSocket Handler
 async def websocket_handler(websocket, path):
     global running
-    try:
-        async for message in websocket:
-            command = json.loads(message).get("command")
+    async for message in websocket:
+        command = json.loads(message).get("command")
+        if command == "START_MONITORING":
+            running = True
+            await websocket.send(json.dumps({"status": "Monitoring started"}))
+        elif command == "STOP_MONITORING":
+            running = False
+            await websocket.send(json.dumps({"status": "Monitoring stopped"}))
 
-            if command == "START_MONITORING":
-                running = True
-                await websocket.send(json.dumps({"status": "Monitoring started"}))
-            elif command == "STOP_MONITORING":
-                running = False
-                await websocket.send(json.dumps({"status": "Monitoring stopped"}))
-            else:
-                await websocket.send(json.dumps({"error": "Unknown command"}))
-
-            # Continuously send data while monitoring
-            while running:
-                data = {
-                    "bpm": bpm_value,
-                    "temperature": temperature_value,
-                    "stress_level": stress_level
-                }
-                await websocket.send(json.dumps(data))
-                await asyncio.sleep(1)
-    except websockets.exceptions.ConnectionClosed:
-        print("Client disconnected.")
+        # Send sensor data only when monitoring
+        while running:
+            data = {
+                "bpm": bpm_value,
+                "temperature": temperature_value,
+                "stress_level": stress_level
+            }
+            await websocket.send(json.dumps(data))
+            await asyncio.sleep(1)
 
 # Start WebSocket Server
 def start_websocket_server():
-    async def websocket_server():
-        start_server = websockets.serve(websocket_handler, "0.0.0.0", 8765)
-        await start_server
-
-    asyncio.run(websocket_server())  # Initialize the asyncio loop and run the server
-
+    asyncio.run(websockets.serve(websocket_handler, "0.0.0.0", 8765))
 
 # Main function
 if __name__ == "__main__":
