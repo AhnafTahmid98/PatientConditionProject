@@ -298,7 +298,7 @@ def update_display():
         email_sent_display = False  # Reset display flag after showing
         time.sleep(1.5)
 
-# Main function
+# Main function with improved interruption handling
 if __name__ == "__main__":
     try:
         # Start each monitoring thread
@@ -322,11 +322,12 @@ if __name__ == "__main__":
         running = False  # Signal all threads to stop
 
     finally:
-        # Wait for each thread to finish with a timeout
-        gsr_thread.join(timeout=1)
-        heart_rate_thread.join(timeout=1)
-        temperature_thread.join(timeout=1)
-        display_thread.join(timeout=1)
+        # Attempt to join threads with a timeout and handle exceptions
+        for thread in [gsr_thread, heart_rate_thread, temperature_thread, display_thread]:
+            try:
+                thread.join(timeout=1)
+            except KeyboardInterrupt:
+                print("Forced exit; thread did not terminate in time.")
 
         # Cleanup GPIO and other resources
         set_leds_and_buzzer("Normal", False)
