@@ -69,22 +69,6 @@ RELAXED_THRESHOLD = BASELINE_VALUE * 0.9
 NORMAL_THRESHOLD = BASELINE_VALUE * 1.1
 ELEVATED_THRESHOLD = BASELINE_VALUE * 1.3
 
-# Heart rate thresholds and variables
-high_threshold = 2.5
-low_threshold = 1.5
-last_pulse_time = 0
-first_pulse = True
-bpm_history = []  # For storing recent BPM values for graphing
-
-# BPM thresholds for status levels
-normal_bpm_range = (60, 100)
-warning_bpm_range = (50, 120)
-
-# Temperature thresholds
-HUMAN_TEMP_RANGE = (35.8, 38.0)
-HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
-MAX_ATTEMPTS = 3
-
 # Function to send an email alert
 def send_email_alert(status):
     global email_count, email_sent_display
@@ -195,6 +179,17 @@ def monitor_gsr():
             print("GSR error, reinitializing...")
             time.sleep(1)
 
+# Heart rate thresholds and variables
+high_threshold = 2.5
+low_threshold = 1.5
+last_pulse_time = 0
+first_pulse = True
+bpm_history = []  # For storing recent BPM values for graphing
+
+# BPM thresholds for status levels
+normal_bpm_range = (60, 100)
+warning_bpm_range = (50, 120)
+
 # Heart Rate Monitoring
 def monitor_heart_rate():
     global bpm_value, last_pulse_time, first_pulse, bpm_history
@@ -223,6 +218,11 @@ def monitor_heart_rate():
         except OSError:
             print("Heart Rate error, reinitializing...")
             time.sleep(1)
+
+# Temperature thresholds
+HUMAN_TEMP_RANGE = (35.8, 38.0)
+HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
+MAX_ATTEMPTS = 3
 
 # Temperature Monitoring
 def get_stable_temperature(sensor, readings=20):
