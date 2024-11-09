@@ -150,14 +150,6 @@ def set_leds_and_buzzer(status, interaction):
         GPIO.output(RED_LED, GPIO.LOW)
         GPIO.output(BUZZER_PIN, GPIO.LOW)
 
-# Function to get a stable temperature reading by averaging multiple readings
-def get_stable_temperature(sensor, readings=20):
-    temp_sum = 0
-    for _ in range(readings):
-        temp_sum += sensor.object_temperature
-        time.sleep(0.02)  # Small delay between readings
-    return temp_sum / readings
-
 # Update status based on BPM, GSR, and Temperature, and check for human presence
 def update_status():
     global status, email_count, consecutive_warning_with_human, consecutive_critical_with_human
@@ -257,6 +249,14 @@ def monitor_gsr():
         except Exception as e:
             print(f"Unexpected error in GSR monitoring: {e}")
             time.sleep(1)
+
+# Function to get a stable temperature reading by averaging multiple readings
+def get_stable_temperature(sensor, readings=20):
+    temp_sum = 0
+    for _ in range(readings):
+        temp_sum += sensor.object_temperature
+        time.sleep(0.02)  # Small delay between readings
+    return temp_sum / readings
 
 # Temperature Monitoring
 def monitor_temperature():
