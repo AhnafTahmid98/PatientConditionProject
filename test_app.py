@@ -145,42 +145,42 @@ def set_leds_and_buzzer(status, interaction):
         GPIO.output(RED_LED, GPIO.LOW)
         GPIO.output(BUZZER_PIN, GPIO.LOW)
 
-# Initialize a consecutive count variable
-consecutive_critical_count = 0
-consecutive_warning_count = 0
+# Initialize counters for consecutive "Warning" and "Critical" readings with human presence
+consecutive_warning_with_human = 0
+consecutive_critical_with_human = 0
 required_consecutive_count = 5  # Number of consecutive readings required to trigger an email
 
-# Update status based on BPM, GSR, and Temperature
+# Update status based on BPM, GSR, and Temperature, and check for human presence
 def update_status():
-    global status, email_count, consecutive_critical_count, consecutive_warning_count
+    global status, email_count, consecutive_warning_with_human, consecutive_critical_with_human
 
-    previous_status = status  # Keep track of previous status for comparison
+    # Check human presence and update status
+    human_present = human_interaction and temperature_value >= HUMAN_TEMP_RANGE[0]
+    if human_present:
+        if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 39:
+            status = "Critical"
+            consecutive_critical_with_human += 1
+            consecutive_warning_with_human = 0
+        elif (50 <= bpm_value < 60 or 100 < bpm_value <= 120) or stress_level == "Elevated" or temperature_value > 37.8:
+            status = "Warning"
+            consecutive_warning_with_human += 1
+            consecutive_critical_with_human = 0
+        else:
+            status = "Normal"
+            consecutive_critical_with_human = 0
+            consecutive_warning_with_human = 0
+            email_count = 0  # Reset email count on return to Normal
 
-    # Determine new status
-    if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 39:
-        status = "Critical"
-        consecutive_warning_count = 0  # Reset warning count if we're in critical
-        consecutive_critical_count += 1  # Increase critical count
-    elif (50 <= bpm_value < 60 or 100 < bpm_value <= 120) or stress_level == "Elevated" or temperature_value > 37.8:
-        status = "Warning"
-        consecutive_critical_count = 0  # Reset critical count if we're in warning
-        consecutive_warning_count += 1  # Increase warning count
-    else:
-        status = "Normal"
-        email_count = 0  # Reset email count on return to Normal
-        consecutive_critical_count = 0  # Reset consecutive counts
-        consecutive_warning_count = 0
+        # Only send email if threshold count is met for human-related warning or critical status
+        if status == "Critical" and consecutive_critical_with_human >= required_consecutive_count:
+            send_email_alert(status)
+            consecutive_critical_with_human = 0
+        elif status == "Warning" and consecutive_warning_with_human >= required_consecutive_count:
+            send_email_alert(status)
+            consecutive_warning_with_human = 0
 
-    # Send email only if consecutive count reaches threshold and status hasn't changed
-    if status == "Critical" and consecutive_critical_count >= required_consecutive_count:
-        send_email_alert(status)
-        consecutive_critical_count = 0  # Reset count after sending email
-    elif status == "Warning" and consecutive_warning_count >= required_consecutive_count:
-        send_email_alert(status)
-        consecutive_warning_count = 0  # Reset count after sending email
-
+    # Ensure LEDs and buzzer reflect current status
     set_leds_and_buzzer(status, human_interaction)
-
 
 # GSR Monitoring
 def read_gsr():
