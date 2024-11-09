@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
 import asyncio
 import websockets
+import json
 
 # Load environment variables from .env file
 load_dotenv()
@@ -264,6 +265,7 @@ def monitor_temperature():
         
 # OLED Display Thread with Compact Layout for 128x32 Display
 def update_display():
+    global email_sent_display
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)  # Compact font
     except IOError:
@@ -303,45 +305,64 @@ def update_display():
 
 # WebSocket Handler
 async def websocket_handler(websocket, path):
-    global command_from_app, running
+    global running
     try:
-        while True:
-            if command_from_app == "START_MONITORING":
+        async for message in websocket:
+            command = json.loads(message).get("command")
+
+            if command == "START_MONITORING":
                 running = True
-            elif command_from_app == "STOP_MONITORING":
+                await websocket.send(json.dumps({"status": "Monitoring started"}))
+            elif command == "STOP_MONITORING":
                 running = False
+                await websocket.send(json.dumps({"status": "Monitoring stopped"}))
+            else:
+                await websocket.send(json.dumps({"error": "Unknown command"}))
 
-            await websocket.send(f"BPM: {bpm_value}, Temp: {temperature_value}, Stress: {stress_level}")
-            await asyncio.sleep(1)
-            command_from_app = await websocket.recv()
-            print(f"Command received: {command_from_app}")
-
+            # Continuously send data while monitoring
+            while running:
+                data = {
+                    "bpm": bpm_value,
+                    "temperature": temperature_value,
+                    "stress_level": stress_level
+                }
+                await websocket.send(json.dumps(data))
+                await asyncio.sleep(1)
     except websockets.exceptions.ConnectionClosed:
-        print("Connection closed.")
+        print("Client disconnected.")
 
 # Start WebSocket Server
 def start_websocket_server():
-    asyncio.get_event_loop().run_until_complete(
-        websockets.serve(websocket_handler, "0.0.0.0", 8765)
-    )
-    asyncio.get_event_loop().run_forever()
+    async def websocket_server():
+        start_server = websockets.serve(websocket_handler, "0.0.0.0", 8765)
+        await start_server
+
+    asyncio.run(websocket_server())  # Initialize the asyncio loop and run the server
+
 
 # Main function
 if __name__ == "__main__":
     try:
+        # Start WebSocket server in a separate thread
         websocket_thread = threading.Thread(target=start_websocket_server)
         websocket_thread.start()
 
+        # Start monitoring threads
         gsr_thread = threading.Thread(target=monitor_gsr)
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
+
+        # Wait until 'running' is True before starting threads
+        while not running:
+            time.sleep(0.1)
 
         gsr_thread.start()
         heart_rate_thread.start()
         temperature_thread.start()
         display_thread.start()
 
+        # Ensure threads complete before exiting
         gsr_thread.join()
         heart_rate_thread.join()
         temperature_thread.join()
