@@ -75,12 +75,6 @@ monitoring_task = None
 # Data lock
 data_lock = threading.Lock()
 
-# Thresholds and Variables for GSR
-BASELINE_VALUE = 11000
-RELAXED_THRESHOLD = BASELINE_VALUE * 0.9
-NORMAL_THRESHOLD = BASELINE_VALUE * 1.1
-ELEVATED_THRESHOLD = BASELINE_VALUE * 1.3
-
 # Heart rate thresholds and variables
 high_threshold = 2.5
 low_threshold = 1.5
@@ -91,6 +85,12 @@ bpm_history = []  # For storing recent BPM values for graphing
 # BPM thresholds for status levels
 normal_bpm_range = (60, 100)
 warning_bpm_range = (50, 120)
+
+# Thresholds and Variables for GSR
+BASELINE_VALUE = 11000
+RELAXED_THRESHOLD = BASELINE_VALUE * 0.9
+NORMAL_THRESHOLD = BASELINE_VALUE * 1.1
+ELEVATED_THRESHOLD = BASELINE_VALUE * 1.3
 
 # Thresholds and Variables for Temperature
 HUMAN_TEMP_RANGE = (35.8, 40.0)
@@ -187,6 +187,34 @@ def update_status():
     # Ensure LEDs and buzzer reflect current status
     set_leds_and_buzzer(status, human_interaction)
 
+# Heart Rate Monitoring
+def monitor_heart_rate():
+    global bpm_value, last_pulse_time, first_pulse, bpm_history
+    while running:
+        try:
+            chan_heart_rate = AnalogIn(adc, 0)
+            voltage = chan_heart_rate.voltage
+            current_time = time.time()
+
+            if voltage > high_threshold and first_pulse:
+                last_pulse_time = current_time
+                first_pulse = False
+            elif voltage > high_threshold and (current_time - last_pulse_time) > 0.4:
+                pulse_interval = (current_time - last_pulse_time) * 1000  # Convert to milliseconds
+                bpm_value = 60000 / pulse_interval
+                last_pulse_time = current_time
+
+                bpm_history.append(bpm_value)
+                if len(bpm_history) > 20:
+                    bpm_history.pop(0)
+                print(f"Heart Rate: {bpm_value:.2f} BPM")
+                
+                update_status()
+            time.sleep(0.1)
+        except OSError:
+            print("Heart Rate error, reinitializing...")
+            time.sleep(1)
+
 # GSR Monitoring
 def read_gsr():
     chan_gsr = AnalogIn(adc, 1)
@@ -219,34 +247,6 @@ def monitor_gsr():
             time.sleep(3)
         except OSError:
             print("GSR error, reinitializing...")
-            time.sleep(1)
-
-# Heart Rate Monitoring
-def monitor_heart_rate():
-    global bpm_value, last_pulse_time, first_pulse, bpm_history
-    while running:
-        try:
-            chan_heart_rate = AnalogIn(adc, 0)
-            voltage = chan_heart_rate.voltage
-            current_time = time.time()
-
-            if voltage > high_threshold and first_pulse:
-                last_pulse_time = current_time
-                first_pulse = False
-            elif voltage > high_threshold and (current_time - last_pulse_time) > 0.4:
-                pulse_interval = (current_time - last_pulse_time) * 1000  # Convert to milliseconds
-                bpm_value = 60000 / pulse_interval
-                last_pulse_time = current_time
-
-                bpm_history.append(bpm_value)
-                if len(bpm_history) > 20:
-                    bpm_history.pop(0)
-                print(f"Heart Rate: {bpm_value:.2f} BPM")
-                
-                update_status()
-            time.sleep(0.1)
-        except OSError:
-            print("Heart Rate error, reinitializing...")
             time.sleep(1)
 
 # Temperature Monitoring
@@ -371,8 +371,8 @@ if __name__ == "__main__":
         websocket_thread.start()
 
         # Start monitoring threads
-        gsr_thread = threading.Thread(target=monitor_gsr)
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
+        gsr_thread = threading.Thread(target=monitor_gsr)
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
 
@@ -380,14 +380,14 @@ if __name__ == "__main__":
         while not running:
             time.sleep(0.1)
 
-        gsr_thread.start()
         heart_rate_thread.start()
+        gsr_thread.start()
         temperature_thread.start()
         display_thread.start()
 
         # Ensure threads complete before exiting
-        gsr_thread.join()
         heart_rate_thread.join()
+        gsr_thread.join()
         temperature_thread.join()
         display_thread.join()
 
