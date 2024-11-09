@@ -258,6 +258,10 @@ def get_stable_temperature(sensor, readings=20):
         time.sleep(0.02)  # Small delay between readings
     return temp_sum / readings
 
+# Function to calculate the dynamic temperature threshold based on ambient temperature
+def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
+    return ambient_temp + offset
+
 # Temperature Monitoring
 def monitor_temperature():
     global temperature_value, HUMAN_TEMP_THRESHOLD_OFFSET
