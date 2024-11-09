@@ -56,4 +56,7 @@ async def start_server():
         await asyncio.Future()  # Run indefinitely
 
 # Run the server
-asyncio.run(start_server())
+try:
+    asyncio.run(start_server())
+except KeyboardInterrupt:
+    print("Server stopped.")
