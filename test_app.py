@@ -65,9 +65,6 @@ human_interaction = False
 email_count = 0
 email_sent_display = False
 
-consecutive_warning_with_human = 0
-consecutive_critical_with_human = 0
-
 # Flags for control
 running = True  # Controls the monitoring threads
 websocket_running = False  # Controls WebSocket data transmission
@@ -89,16 +86,16 @@ bpm_history = []  # For storing recent BPM values for graphing
 normal_bpm_range = (60, 100)
 warning_bpm_range = (50, 120)
 
-# Thresholds and Variables for Temperature
-HUMAN_TEMP_RANGE = (35.8, 40.0)
-HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
-MAX_ATTEMPTS = 3
-
 # Thresholds and Variables for GSR
 BASELINE_VALUE = 11000
 RELAXED_THRESHOLD = BASELINE_VALUE * 0.9
 NORMAL_THRESHOLD = BASELINE_VALUE * 1.1
 ELEVATED_THRESHOLD = BASELINE_VALUE * 1.3
+
+# Thresholds and Variables for Temperature
+HUMAN_TEMP_RANGE = (35.8, 40.0)
+HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
+MAX_ATTEMPTS = 3
 
 # Function to send an email alert
 def send_email_alert(status):
@@ -132,39 +129,38 @@ def send_email_alert(status):
 
 # Function to control LEDs and buzzer based on status
 def set_leds_and_buzzer(status, interaction):
-    print(f"Setting LEDs and Buzzer - Status: {status}, Interaction: {interaction}")  # Debugging line
     if status == "Normal":
         GPIO.output(GREEN_LED, GPIO.HIGH)
         GPIO.output(YELLOW_LED, GPIO.LOW)
         GPIO.output(RED_LED, GPIO.LOW)
         GPIO.output(BUZZER_PIN, GPIO.LOW)
-        print("LEDs set to Normal: Green ON, others OFF.")  # Debugging line
     elif status == "Warning":
         GPIO.output(GREEN_LED, GPIO.LOW)
         GPIO.output(YELLOW_LED, GPIO.HIGH)
         GPIO.output(RED_LED, GPIO.LOW)
         GPIO.output(BUZZER_PIN, GPIO.LOW)
-        print("LEDs set to Warning: Yellow ON, others OFF.")  # Debugging line
     elif status == "Critical" and interaction:
         GPIO.output(GREEN_LED, GPIO.LOW)
         GPIO.output(YELLOW_LED, GPIO.LOW)
         GPIO.output(RED_LED, GPIO.HIGH)
         GPIO.output(BUZZER_PIN, GPIO.HIGH)
-        print("LEDs set to Critical: Red ON, Buzzer ON.")  # Debugging line
     else:
         GPIO.output(GREEN_LED, GPIO.LOW)
         GPIO.output(YELLOW_LED, GPIO.LOW)
         GPIO.output(RED_LED, GPIO.LOW)
         GPIO.output(BUZZER_PIN, GPIO.LOW)
-        print("All LEDs and Buzzer OFF.")  # Debugging line
+
+# Initialize counters for consecutive "Warning" and "Critical" readings with human presence
+consecutive_warning_with_human = 0
+consecutive_critical_with_human = 0
+required_consecutive_count = 5  # Number of consecutive readings required to trigger an email
 
 # Update status based on BPM, GSR, and Temperature, and check for human presence
 def update_status():
     global status, email_count, consecutive_warning_with_human, consecutive_critical_with_human
 
+    # Check human presence and update status
     human_present = human_interaction and temperature_value >= HUMAN_TEMP_RANGE[0]
-    print(f"Updating Status - Human Present: {human_present}, BPM: {bpm_value}, Temp: {temperature_value}, Stress: {stress_level}")  # Debugging line
-    
     if human_present:
         if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 39:
             status = "Critical"
@@ -188,7 +184,7 @@ def update_status():
             send_email_alert(status)
             consecutive_warning_with_human = 0
 
-    print(f"Status set to: {status}")  # Debugging line
+    # Ensure LEDs and buzzer reflect current status
     set_leds_and_buzzer(status, human_interaction)
 
 # Heart Rate Monitoring
@@ -218,9 +214,7 @@ def monitor_heart_rate():
         except OSError:
             print("Heart Rate error, reinitializing...")
             time.sleep(1)
-        except Exception as e:
-            print(f"Unexpected error in heart rate monitoring: {e}")
-            time.sleep(1)
+
 # Function to get a stable temperature reading by averaging multiple readings
 def get_stable_temperature(sensor, readings=20):
     temp_sum = 0
@@ -293,9 +287,6 @@ def monitor_gsr():
             time.sleep(3)
         except OSError:
             print("GSR error, reinitializing...")
-            time.sleep(1)
-        except Exception as e:
-            print(f"Unexpected error in GSR monitoring: {e}")
             time.sleep(1)
         
 # OLED Display Thread
