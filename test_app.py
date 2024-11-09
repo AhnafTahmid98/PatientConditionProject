@@ -326,29 +326,24 @@ async def websocket_handler(websocket, path):
     global running
     async for message in websocket:
         command = json.loads(message).get("command")
+        
         if command == "START_MONITORING":
             running = True
             await websocket.send(json.dumps({"status": "Monitoring started"}))
-            # Send initial data immediately after start
-            data = {
-                "bpm": bpm_value,
-                "temperature": temperature_value,
-                "stress_level": stress_level
-            }
-            await websocket.send(json.dumps(data))
+            
+            # Start sending data while `running` is True
+            while running:
+                data = {
+                    "bpm": bpm_value,
+                    "temperature": temperature_value,
+                    "stress_level": stress_level
+                }
+                await websocket.send(json.dumps(data))
+                await asyncio.sleep(1)  # Adjust the interval as needed
+
         elif command == "STOP_MONITORING":
             running = False
             await websocket.send(json.dumps({"status": "Monitoring stopped"}))
-
-        # Send continuous data when monitoring
-        while running:
-            data = {
-                "bpm": bpm_value,
-                "temperature": temperature_value,
-                "stress_level": stress_level
-            }
-            await websocket.send(json.dumps(data))
-            await asyncio.sleep(1)
 
 # Start WebSocket Server
 def start_websocket_server():
