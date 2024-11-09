@@ -13,6 +13,7 @@ import adafruit_mlx90614
 import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
+import signal
 
 # Load environment variables from .env file
 load_dotenv()
@@ -84,6 +85,15 @@ warning_bpm_range = (50, 120)
 HUMAN_TEMP_RANGE = (35.8, 38.0)
 HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
 MAX_ATTEMPTS = 3
+
+# Signal handler to capture Control + C
+def signal_handler(sig, frame):
+    global running
+    print("Monitoring stopped by user.")
+    running = False
+
+# Register signal handler
+signal.signal(signal.SIGINT, signal_handler)
 
 # Function to send an email alert
 def send_email_alert(status):
