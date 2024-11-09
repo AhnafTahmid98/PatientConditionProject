@@ -306,6 +306,10 @@ if __name__ == "__main__":
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
         
+        # Wait until 'running' is True before starting threads
+        while not running:
+            time.sleep(0.1)
+
         gsr_thread.start()
         heart_rate_thread.start()
         temperature_thread.start()
@@ -317,7 +321,11 @@ if __name__ == "__main__":
         display_thread.join()
 
     except KeyboardInterrupt:
-        print("Monitoring stopped.")
-        running = False
-        set_leds_and_buzzer("Normal", False)  # Turn off all LEDs and buzzer on exit
+        print("Monitoring stopped by user.")
+        running = False  # Signal all threads to stop
+
+    finally:
+        # Cleanup GPIO and other resources before exiting
+        set_leds_and_buzzer("Normal", False)
         GPIO.cleanup()
+        print("All resources have been released and the program has exited cleanly.")
