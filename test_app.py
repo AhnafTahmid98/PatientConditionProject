@@ -150,11 +150,6 @@ def set_leds_and_buzzer(status, interaction):
         GPIO.output(RED_LED, GPIO.LOW)
         GPIO.output(BUZZER_PIN, GPIO.LOW)
 
-# Initialize counters for consecutive "Warning" and "Critical" readings with human presence
-consecutive_warning_with_human = 0
-consecutive_critical_with_human = 0
-required_consecutive_count = 5  # Number of consecutive readings required to trigger an email
-
 # Update status based on BPM, GSR, and Temperature, and check for human presence
 def update_status():
     global status, email_count, consecutive_warning_with_human, consecutive_critical_with_human
@@ -214,6 +209,9 @@ def monitor_heart_rate():
         except OSError:
             print("Heart Rate error, reinitializing...")
             time.sleep(1)
+        except Exception as e:
+            print(f"Unexpected error in heart rate monitoring: {e}")
+            time.sleep(1)
 
 # GSR Monitoring
 def read_gsr():
@@ -248,83 +246,68 @@ def monitor_gsr():
         except OSError:
             print("GSR error, reinitializing...")
             time.sleep(1)
+        except Exception as e:
+            print(f"Unexpected error in GSR monitoring: {e}")
+            time.sleep(1)
 
 # Temperature Monitoring
-def get_stable_temperature(sensor, readings=20):
-    temp_sum = 0
-    for _ in range(readings):
-        temp_sum += sensor.object_temperature
-        time.sleep(0.02)
-    return temp_sum / readings
-
-def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
-    return ambient_temp + offset
-
 def monitor_temperature():
     global temperature_value, HUMAN_TEMP_THRESHOLD_OFFSET
     no_detection_count = 0
     while running:
-        object_temp = get_stable_temperature(mlx)
-        dynamic_threshold = get_dynamic_threshold(mlx.ambient_temperature)
+        try:
+            object_temp = get_stable_temperature(mlx)
+            dynamic_threshold = get_dynamic_threshold(mlx.ambient_temperature)
 
-        if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
-            temperature_value = object_temp
-            with data_lock:
-                print(f"Human Body Temperature: {temperature_value:.2f}°C")
-            no_detection_count = 0
-        else:
-            no_detection_count += 1
-            with data_lock:
-                temperature_value = 0
-                print("No human body detected.")
+            if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
+                temperature_value = object_temp
+                with data_lock:
+                    print(f"Human Body Temperature: {temperature_value:.2f}°C")
+                no_detection_count = 0
+            else:
+                no_detection_count += 1
+                with data_lock:
+                    temperature_value = 0
+                    print("No human body detected.")
 
-        if no_detection_count >= MAX_ATTEMPTS:
-            HUMAN_TEMP_THRESHOLD_OFFSET += 0.1
-            no_detection_count = 0
-        time.sleep(1)
+            if no_detection_count >= MAX_ATTEMPTS:
+                HUMAN_TEMP_THRESHOLD_OFFSET += 0.1
+                no_detection_count = 0
+            time.sleep(1)
+        except Exception as e:
+            print(f"Unexpected error in temperature monitoring: {e}")
+            time.sleep(1)
         
-# OLED Display Thread with Compact Layout for 128x32 Display
+# OLED Display Thread
 def update_display():
     global email_sent_display
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)  # Compact font
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)
     except IOError:
         font = ImageFont.load_default()
     
     while running:
-        with data_lock:
-            image = Image.new("1", (128, 32))
-            draw = ImageDraw.Draw(image)
-            draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
+        try:
+            with data_lock:
+                image = Image.new("1", (128, 32))
+                draw = ImageDraw.Draw(image)
+                draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
+                draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
+                draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
+                if email_sent_display:
+                    draw.text((80, 22), "Email Sent", font=font, fill=255)
+
+                oled.image(image)
+                oled.show()
             
-            if bpm_history:
-                max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
-                min_bpm = min(bpm_history)
-                graph_height = 8
-                graph_width = 60
-                x_start = 50
-                y_start = 2
-
-                for i in range(1, len(bpm_history)):
-                    y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
-                    y2 = y_start + graph_height - int((bpm_history[i] - min_bpm) / (max_bpm - min_bpm) * graph_height)
-                    x1 = x_start + (i - 1) * (graph_width // (len(bpm_history) - 1))
-                    x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
-                    draw.line((x1, y1, x2, y2), fill=255, width=1)
-
-            draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
-            draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
-            if email_sent_display:
-                draw.text((80, 22), "Email Sent", font=font, fill=255)  # Display "Email Sent" on OLED
-
-            oled.image(image)
-            oled.show()
-        
-        email_sent_display = False  # Reset display flag after showing
-        time.sleep(1.5)
+            email_sent_display = False
+            time.sleep(1.5)
+        except Exception as e:
+            print(f"Unexpected error in OLED display: {e}")
+            time.sleep(1)
 
 # WebSocket Handler
-async def websocket_handler(websocket, _):  # `_` instead of `path` to indicate it's unused
+async def websocket_handler(websocket, _):
     global websocket_running, monitoring_task
 
     async def send_data():
@@ -337,16 +320,13 @@ async def websocket_handler(websocket, _):  # `_` instead of `path` to indicate 
             await websocket.send(json.dumps(data))
             await asyncio.sleep(1)
 
-    # Main command handler
     async for message in websocket:
         command = json.loads(message).get("command")
-
         if command == "START_MONITORING":
             if not websocket_running:
                 websocket_running = True
                 await websocket.send(json.dumps({"status": "Monitoring started"}))
                 monitoring_task = asyncio.create_task(send_data())
-
         elif command == "STOP_MONITORING":
             if websocket_running:
                 websocket_running = False
@@ -366,27 +346,19 @@ def start_websocket_server():
 # Main function
 if __name__ == "__main__":
     try:
-        # Start WebSocket server in a separate thread
         websocket_thread = threading.Thread(target=start_websocket_server)
         websocket_thread.start()
 
-        # Start monitoring threads
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
         gsr_thread = threading.Thread(target=monitor_gsr)
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
 
-        # Wait until 'running' is True before starting threads
-        while not running:
-            time.sleep(0.1)
-
         heart_rate_thread.start()
-        time.sleep(0.1)
         gsr_thread.start()
         temperature_thread.start()
         display_thread.start()
 
-        # Ensure threads complete before exiting
         heart_rate_thread.join()
         gsr_thread.join()
         temperature_thread.join()
