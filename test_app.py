@@ -381,6 +381,7 @@ if __name__ == "__main__":
             time.sleep(0.1)
 
         heart_rate_thread.start()
+        time.sleep(0.1)
         gsr_thread.start()
         temperature_thread.start()
         display_thread.start()
