@@ -4,6 +4,7 @@ import json
 
 async def command_handler(websocket, path):
     async for message in websocket:
+        print(f"Received message: {message}")  # Log received message for debugging
         if not message:
             print("Received an empty message, skipping...")
             continue
