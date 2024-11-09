@@ -322,11 +322,11 @@ if __name__ == "__main__":
         running = False  # Signal all threads to stop
 
     finally:
-        # Wait for each thread to finish
-        gsr_thread.join()
-        heart_rate_thread.join()
-        temperature_thread.join()
-        display_thread.join()
+        # Wait for each thread to finish with a timeout
+        gsr_thread.join(timeout=1)
+        heart_rate_thread.join(timeout=1)
+        temperature_thread.join(timeout=1)
+        display_thread.join(timeout=1)
 
         # Cleanup GPIO and other resources
         set_leds_and_buzzer("Normal", False)
