@@ -64,14 +64,16 @@ status = "Normal"
 human_interaction = False
 email_count = 0
 email_sent_display = False
-running = False  # Monitoring flag, controlled by commands from app
+
+# Flags for control
+running = True  # Controls the monitoring threads
+websocket_running = False  # Controls WebSocket data transmission
 
 # Global variable to store the monitoring task- websocket
 monitoring_task = None
 
 # Data lock
 data_lock = threading.Lock()
-running = True  # Flag to control threads
 
 # Thresholds and Variables for GSR
 BASELINE_VALUE = 11000
@@ -323,35 +325,34 @@ def update_display():
 
 # WebSocket Handler
 async def websocket_handler(websocket, _):  # `_` instead of `path` to indicate it's unused
-    global running, monitoring_task
+    global websocket_running, monitoring_task
 
     async def send_data():
-        while running:
+        while websocket_running:
             data = {
                 "bpm": bpm_value,
                 "temperature": temperature_value,
                 "stress_level": stress_level
             }
             await websocket.send(json.dumps(data))
-            await asyncio.sleep(1)  # Adjust the interval as needed
+            await asyncio.sleep(1)
 
     # Main command handler
     async for message in websocket:
         command = json.loads(message).get("command")
 
         if command == "START_MONITORING":
-            if not running:
-                running = True
+            if not websocket_running:
+                websocket_running = True
                 await websocket.send(json.dumps({"status": "Monitoring started"}))
-                # Start the data-sending task
                 monitoring_task = asyncio.create_task(send_data())
 
         elif command == "STOP_MONITORING":
-            if running:
-                running = False
+            if websocket_running:
+                websocket_running = False
                 await websocket.send(json.dumps({"status": "Monitoring stopped"}))
                 if monitoring_task:
-                    monitoring_task.cancel()  # Cancel the existing task
+                    monitoring_task.cancel()
                     monitoring_task = None
             
 # Start WebSocket Server
