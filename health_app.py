@@ -235,6 +235,7 @@ def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
     return ambient_temp + offset
 
 def monitor_temperature(shared_data):
+    global HUMAN_TEMP_THRESHOLD_OFFSET 
     no_detection_count = 0
     while shared_data["running"]:
         object_temp = get_stable_temperature(mlx)
@@ -292,7 +293,7 @@ def update_display(display_queue, email_sent_display, running):
                     draw.line((x1, y1, x2, y2), fill=255, width=1)
             
             draw.text((0, 12), f"Temp.: {temperature_value}C", font=font, fill=255)
-            draw.text((0, 24), f"Stress: {stress_level}", font=font, fill=255)
+            draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
             
             # Display "Email Sent" message if applicable
             if email_sent_display.value:
