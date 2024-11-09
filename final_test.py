@@ -260,6 +260,7 @@ def monitor_temperature():
 
 # OLED Display Thread with Compact Layout for 128x32 Display
 def update_display():
+    global email_sent_display  # Declare as global to avoid UnboundLocalError
     try:
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)  # Compact font
     except IOError:
