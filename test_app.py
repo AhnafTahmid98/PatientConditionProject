@@ -145,27 +145,42 @@ def set_leds_and_buzzer(status, interaction):
         GPIO.output(RED_LED, GPIO.LOW)
         GPIO.output(BUZZER_PIN, GPIO.LOW)
 
+# Initialize a consecutive count variable
+consecutive_critical_count = 0
+consecutive_warning_count = 0
+required_consecutive_count = 5  # Number of consecutive readings required to trigger an email
+
 # Update status based on BPM, GSR, and Temperature
 def update_status():
-    global status, email_count
-    continuous_warning_or_critical = False
+    global status, email_count, consecutive_critical_count, consecutive_warning_count
 
+    previous_status = status  # Keep track of previous status for comparison
+
+    # Determine new status
     if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 38:
-        if status == "Critical":
-            continuous_warning_or_critical = True
         status = "Critical"
+        consecutive_warning_count = 0  # Reset warning count if we're in critical
+        consecutive_critical_count += 1  # Increase critical count
     elif (50 <= bpm_value < 60 or 100 < bpm_value <= 120) or stress_level == "Elevated" or temperature_value > 37:
-        if status == "Warning":
-            continuous_warning_or_critical = True
         status = "Warning"
+        consecutive_critical_count = 0  # Reset critical count if we're in warning
+        consecutive_warning_count += 1  # Increase warning count
     else:
         status = "Normal"
         email_count = 0  # Reset email count on return to Normal
+        consecutive_critical_count = 0  # Reset consecutive counts
+        consecutive_warning_count = 0
 
-    if continuous_warning_or_critical:
+    # Send email only if consecutive count reaches threshold and status hasn't changed
+    if status == "Critical" and consecutive_critical_count >= required_consecutive_count:
         send_email_alert(status)
+        consecutive_critical_count = 0  # Reset count after sending email
+    elif status == "Warning" and consecutive_warning_count >= required_consecutive_count:
+        send_email_alert(status)
+        consecutive_warning_count = 0  # Reset count after sending email
 
     set_leds_and_buzzer(status, human_interaction)
+
 
 # GSR Monitoring
 def read_gsr():
