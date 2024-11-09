@@ -300,34 +300,48 @@ def update_display():
     while running:
         try:
             with data_lock:
+                # Create a new image with a 1-bit color format for the OLED display
                 image = Image.new("1", (128, 32))
                 draw = ImageDraw.Draw(image)
+                
+                # Display BPM value
                 draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
+                
+                # Draw BPM history graph if available
                 if bpm_history:
-                max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
-                min_bpm = min(bpm_history)
-                graph_height = 8
-                graph_width = 60
-                x_start = 50
-                y_start = 2
+                    max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
+                    min_bpm = min(bpm_history)
+                    graph_height = 8
+                    graph_width = 60
+                    x_start = 50
+                    y_start = 2
 
-                for i in range(1, len(bpm_history)):
-                    y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
-                    y2 = y_start + graph_height - int((bpm_history[i] - min_bpm) / (max_bpm - min_bpm) * graph_height)
-                    x1 = x_start + (i - 1) * (graph_width // (len(bpm_history) - 1))
-                    x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
-                    draw.line((x1, y1, x2, y2), fill=255, width=1)
+                    for i in range(1, len(bpm_history)):
+                        y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
+                        y2 = y_start + graph_height - int((bpm_history[i] - min_bpm) / (max_bpm - min_bpm) * graph_height)
+                        x1 = x_start + (i - 1) * (graph_width // (len(bpm_history) - 1))
+                        x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
+                        draw.line((x1, y1, x2, y2), fill=255, width=1)
 
-            draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
-            draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
-            if email_sent_display:
-                draw.text((80, 22), "Email Sent", font=font, fill=255)  # Display "Email Sent" on OLED
+                # Display temperature and stress level
+                draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
+                draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
+                
+                # Display "Email Sent" if flag is set
+                if email_sent_display:
+                    draw.text((80, 22), "Email Sent", font=font, fill=255)
 
-            oled.image(image)
-            oled.show()
+                # Show the image on the OLED display
+                oled.image(image)
+                oled.show()
+            
+            # Reset the display flag after showing
+            email_sent_display = False
+            time.sleep(1.5)
         
-        email_sent_display = False  # Reset display flag after showing
-        time.sleep(1.5)
+        except Exception as e:
+            print(f"Unexpected error in OLED display: {e}")
+            time.sleep(1)
 
 # WebSocket Handler
 async def websocket_handler(websocket, _):
