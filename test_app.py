@@ -322,29 +322,33 @@ def update_display():
         time.sleep(1.5)
 
 # WebSocket Handler
-async def websocket_handler(websocket, path):
+async def websocket_handler(websocket, _):  # `_` instead of `path` to indicate it's unused
     global running
+
+    async def send_data():
+        while running:
+            data = {
+                "bpm": bpm_value,
+                "temperature": temperature_value,
+                "stress_level": stress_level
+            }
+            await websocket.send(json.dumps(data))
+            await asyncio.sleep(1)  # Adjust the interval as needed
+
+    # Main command handler
     async for message in websocket:
         command = json.loads(message).get("command")
-        
+
         if command == "START_MONITORING":
             running = True
             await websocket.send(json.dumps({"status": "Monitoring started"}))
-            
-            # Start sending data while `running` is True
-            while running:
-                data = {
-                    "bpm": bpm_value,
-                    "temperature": temperature_value,
-                    "stress_level": stress_level
-                }
-                await websocket.send(json.dumps(data))
-                await asyncio.sleep(1)  # Adjust the interval as needed
+            # Start the data-sending task
+            asyncio.create_task(send_data())
 
         elif command == "STOP_MONITORING":
             running = False
             await websocket.send(json.dumps({"status": "Monitoring stopped"}))
-
+            
 # Start WebSocket Server
 def start_websocket_server():
     loop = asyncio.new_event_loop()
