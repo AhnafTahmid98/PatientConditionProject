@@ -388,6 +388,8 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("Monitoring stopped.")
+    finally:
         running = False
         set_leds_and_buzzer("Normal", False)
         GPIO.cleanup()
+        print("Cleaned up resources.")
