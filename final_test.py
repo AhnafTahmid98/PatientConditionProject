@@ -13,7 +13,6 @@ import adafruit_mlx90614
 import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
-import signal
 
 # Load environment variables from .env file
 load_dotenv()
@@ -85,15 +84,6 @@ warning_bpm_range = (50, 120)
 HUMAN_TEMP_RANGE = (35.8, 38.0)
 HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
 MAX_ATTEMPTS = 3
-
-# Signal handler to capture Control + C
-def signal_handler(sig, frame):
-    global running
-    print("Monitoring stopped by user.")
-    running = False
-
-# Register signal handler
-signal.signal(signal.SIGINT, signal_handler)
 
 # Function to send an email alert
 def send_email_alert(status):
@@ -317,29 +307,23 @@ if __name__ == "__main__":
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
 
-        # Start threads
+        # Wait until 'running' is True before starting threads
+        while not running:
+            time.sleep(0.1)
+
         gsr_thread.start()
         heart_rate_thread.start()
         temperature_thread.start()
         display_thread.start()
 
-        # Keep the main program running to allow threads to execute
-        while running:
-            time.sleep(0.1)
+        # Ensure threads complete before exiting
+        gsr_thread.join()
+        heart_rate_thread.join()
+        temperature_thread.join()
+        display_thread.join()
 
     except KeyboardInterrupt:
-        print("Monitoring stopped by user.")
-        running = False  # Signal all threads to stop
-
-    finally:
-        # Attempt to join threads with a timeout and handle exceptions
-        for thread in [gsr_thread, heart_rate_thread, temperature_thread, display_thread]:
-            try:
-                thread.join(timeout=1)
-            except KeyboardInterrupt:
-                print("Forced exit; thread did not terminate in time.")
-
-        # Cleanup GPIO and other resources
+        print("Monitoring stopped.")
+        running = False
         set_leds_and_buzzer("Normal", False)
         GPIO.cleanup()
-        print("All resources have been released and the program has exited cleanly.")
