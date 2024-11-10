@@ -375,7 +375,7 @@ async def websocket_handler(websocket, _):
 def start_websocket_server():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    server = websockets.serve(websocket_handler, "0.0.0.0", 8765)
+    server = websockets.serve(websocket_handler, "0.0.0.0", 8766)
     loop.run_until_complete(server)
     loop.run_forever()
 
