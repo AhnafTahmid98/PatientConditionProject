@@ -343,7 +343,6 @@ def update_display():
             print(f"Unexpected error in OLED display: {e}")
             time.sleep(1)
 
-# WebSocket Handler
 async def websocket_handler(websocket, _):
     global websocket_running, monitoring_task
 
@@ -355,7 +354,7 @@ async def websocket_handler(websocket, _):
                 "stress_level": stress_level
             }
             await websocket.send(json.dumps(data))
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)  # Increase frequency if needed
 
     async for message in websocket:
         command = json.loads(message).get("command")
