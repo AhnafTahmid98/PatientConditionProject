@@ -2,6 +2,10 @@ import asyncio
 import websockets
 import json
 import subprocess
+import os
+
+# Define the path to the virtual environment Python interpreter
+VENV_PYTHON = "/home/pi/PatientConditionProject/venv/bin/python3"
 
 test_app_process = None
 
@@ -20,10 +24,10 @@ async def command_handler(websocket, path):
 
                 if command == "START_MONITORING":
                     print("Start monitoring command received")
-                    # Start `test_app.py` if it's not already running
+                    # Start `test_app.py` with virtual environment's Python interpreter
                     if test_app_process is None or test_app_process.poll() is not None:
                         test_app_process = subprocess.Popen(
-                            ["python3", "test_app.py"],
+                            [VENV_PYTHON, "test_app.py"],
                             cwd="/home/pi/PatientConditionProject"
                         )
                         await websocket.send(json.dumps({"status": "Monitoring started"}))
