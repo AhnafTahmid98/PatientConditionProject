@@ -345,17 +345,17 @@ def update_display():
 
 async def websocket_handler(websocket, _):
     global websocket_running, monitoring_task
-
+    print("WebSocket handler connected")  # Log for connection confirmation
     async def send_data():
         while websocket_running:
-           data = {
-              "bpm": bpm_value,
-              "temperature": temperature_value,
-              "stress_level": stress_level
+            data = {
+               "bpm": bpm_value,
+               "temperature": temperature_value,
+               "stress_level": stress_level
             }
-           print("Sending data to Flutter:", data)  # Debug log
-           await websocket.send(json.dumps(data))
-           await asyncio.sleep(0.5)
+            print("Sending data:", data)  # Debug log
+            await websocket.send(json.dumps(data))
+            await asyncio.sleep(0.5)
 
     async for message in websocket:
         command = json.loads(message).get("command")
