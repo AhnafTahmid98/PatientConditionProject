@@ -56,6 +56,9 @@ adc.gain = 1
 mlx = adafruit_mlx90614.MLX90614(i2c, address=0x5a)
 oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
 
+# Save Senors data
+LAST_DATA_FILE = "/home/pi/PatientConditionProject/last_measurement.json"
+
 # Shared variables
 bpm_value = 0
 temperature_value = 0
@@ -343,36 +346,32 @@ def update_display():
             print(f"Unexpected error in OLED display: {e}")
             time.sleep(1)
 
+# WebSocket handler for streaming data
 async def websocket_handler(websocket, _):
     global websocket_running, monitoring_task
-    print("WebSocket handler connected")  # Log for connection confirmation
     async def send_data():
         while websocket_running:
-            data = {
-               "bpm": bpm_value,
-               "temperature": temperature_value,
-               "stress_level": stress_level
-            }
-            print("Sending data:", data)  # Debug log
+            data = {"bpm": bpm_value, "temperature": temperature_value, "stress_level": stress_level}
             await websocket.send(json.dumps(data))
+            # Save the last measurement
+            with open(LAST_DATA_FILE, "w") as f:
+                json.dump(data, f)
             await asyncio.sleep(0.5)
-
     async for message in websocket:
         command = json.loads(message).get("command")
         if command == "START_MONITORING":
             if not websocket_running:
                 websocket_running = True
-                await websocket.send(json.dumps({"status": "Monitoring started"}))
                 monitoring_task = asyncio.create_task(send_data())
+                await websocket.send(json.dumps({"status": "Monitoring started"}))
         elif command == "STOP_MONITORING":
-            if websocket_running:
-                websocket_running = False
-                await websocket.send(json.dumps({"status": "Monitoring stopped"}))
-                if monitoring_task:
-                    monitoring_task.cancel()
-                    monitoring_task = None
-            
-# Start WebSocket Server
+            websocket_running = False
+            if monitoring_task:
+                monitoring_task.cancel()
+                monitoring_task = None
+            await websocket.send(json.dumps({"status": "Monitoring stopped"}))
+
+# Start WebSocket server
 def start_websocket_server():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
@@ -382,36 +381,28 @@ def start_websocket_server():
 
 # Main function
 if __name__ == "__main__":
-    try:
-        websocket_thread = threading.Thread(target=start_websocket_server)
-        websocket_thread.start()
+    websocket_thread = threading.Thread(target=start_websocket_server)
+    websocket_thread.start()
 
-        heart_rate_thread = threading.Thread(target=monitor_heart_rate)
-        gsr_thread = threading.Thread(target=monitor_gsr)
-        temperature_thread = threading.Thread(target=monitor_temperature)
-        display_thread = threading.Thread(target=update_display)
+    heart_rate_thread = threading.Thread(target=monitor_heart_rate)
+    gsr_thread = threading.Thread(target=monitor_gsr)
+    temperature_thread = threading.Thread(target=monitor_temperature)
+    display_thread = threading.Thread(target=update_display)
 
-        # Wait until 'running' is True before starting threads
-        while not running:
-            time.sleep(0.1)
+    # Start threads
+    heart_rate_thread.start()
+    temperature_thread.start()
+    gsr_thread.start()
+    display_thread.start()
 
-        heart_rate_thread.start()
-        time.sleep(0.1)
-        temperature_thread.start()
-        time.sleep(0.1)
-        gsr_thread.start()
-        display_thread.start()
 
-        # Ensure threads complete before exiting
-        heart_rate_thread.join()
-        gsr_thread.join()
-        temperature_thread.join()
-        display_thread.join()
+    # Ensure threads complete before exiting
+    heart_rate_thread.join()
+    gsr_thread.join()
+    temperature_thread.join()
+    display_thread.join()
 
-    except KeyboardInterrupt:
-        print("Monitoring stopped.")
-    finally:
-        running = False
-        set_leds_and_buzzer("Normal", False)
-        GPIO.cleanup()
-        print("Cleaned up resources.")
+    GPIO.cleanup()
+    print("Cleaned up resources.")
+    
+    
