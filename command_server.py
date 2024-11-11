@@ -9,7 +9,7 @@ VENV_PYTHON = "/home/pi/PatientConditionProject/venv/bin/python3"
 
 test_app_process = None
 
-async def command_handler(websocket, path):
+async def command_handler(websocket, _):
     global test_app_process
 
     try:
