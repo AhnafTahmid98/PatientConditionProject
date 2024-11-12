@@ -42,6 +42,7 @@ async def command_handler(websocket, _):
     Manages WebSocket commands from the client, handling start/stop systemd services
     based on commands and active page in the app.
     """
+    print("WebSocket connection established")  # New debug line
     active_service = None  # Track the currently active service
 
     try:
