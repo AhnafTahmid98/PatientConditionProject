@@ -6,6 +6,7 @@ import subprocess
 # Global variables to retain the last known values for each metric as floats
 last_bpm_value = 0.0
 last_temperature_value = 0.0
+last_stress_level = "None"
 
 # Function to start a specific systemd service
 def start_service(service_name):
@@ -23,35 +24,35 @@ def stop_service(service_name):
 
 # Function to send data based on the active monitoring page
 async def send_data(websocket, active_page):
-    global last_bpm_value, last_temperature_value
+    global last_bpm_value, last_temperature_value, last_stress_level
     while True:
         try:
-            # Read and send data for BPM or Temperature based on the active page
+            # Read and send data for BPM, Temperature, or Stress based on the active page
             if active_page == "BPM":
                 with open("/home/pi/PatientConditionProject/bpm_data.txt", "r") as f:
                     last_bpm_value = float(f.read().strip())
-                data = {"BPM": round(last_bpm_value, 3)}  # Send as float with 3 decimal places
+                data = {"BPM": round(last_bpm_value, 3)}
             elif active_page == "Temperature":
                 with open("/home/pi/PatientConditionProject/temperature_data.txt", "r") as f:
                     last_temperature_value = float(f.read().strip())
-                data = {"Temperature": round(last_temperature_value, 3)}  # Send as float with 3 decimal places
+                data = {"Temperature": round(last_temperature_value, 3)}
+            elif active_page == "GSR":
+                with open("/home/pi/PatientConditionProject/gsr_data.txt", "r") as f:
+                    last_stress_level = f.read().strip()
+                data = {"Stress": last_stress_level}
             else:
-                # Send the last known values even if the monitoring is stopped
-                if active_page == "BPM":
-                    data = {"BPM": round(last_bpm_value, 3)}
-                elif active_page == "Temperature":
-                    data = {"Temperature": round(last_temperature_value, 3)}
-                else:
-                    data = {}  # No data if there's no active monitoring page
+                data = {}  # No data if there's no active monitoring page
 
-            await websocket.send(json.dumps(data))  # Send data to the client
-            await asyncio.sleep(1)  # Adjust frequency as needed
+            await websocket.send(json.dumps(data))
+            await asyncio.sleep(1)
         except (FileNotFoundError, ValueError):
             # Send the last known value if file read fails
             if active_page == "BPM":
                 await websocket.send(json.dumps({"BPM": round(last_bpm_value, 3)}))
             elif active_page == "Temperature":
                 await websocket.send(json.dumps({"Temperature": round(last_temperature_value, 3)}))
+            elif active_page == "GSR":
+                await websocket.send(json.dumps({"Stress": last_stress_level}))
 
 # WebSocket handler for managing incoming commands from the client
 async def command_handler(websocket, _):
@@ -70,6 +71,7 @@ async def command_handler(websocket, _):
             service_map = {
                 "BPM": "heart_rate_monitor.service",
                 "Temperature": "temperature_monitor.service",
+                "GSR": "gsr_monitor.service",
             }
             service_name = service_map.get(page)
 
