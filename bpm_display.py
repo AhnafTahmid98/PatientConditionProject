@@ -7,6 +7,8 @@ from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
+import signal
+import sys
 
 # LED and buzzer pin definitions
 green_led = 17  # GPIO 17
@@ -21,12 +23,10 @@ GPIO.setup(yellow_led, GPIO.OUT)
 GPIO.setup(red_led, GPIO.OUT)
 GPIO.setup(buzzer_pin, GPIO.OUT)
 
-# Initialize I2C bus and ADC
+# Initialize I2C bus, ADC and Oled Display
 i2c = busio.I2C(board.SCL, board.SDA)
 adc = ADS1115(i2c, address=0x48)
 adc.gain = 1
-
-# Initialize OLED display
 oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
 
 # Shared variables
@@ -140,8 +140,20 @@ def update_display():
         # Refresh to avoid blur
         time.sleep(1.5)
 
+# Graceful exit for systemd service
+def cleanup_and_exit(signum, frame):
+    global running
+    running = False
+    set_leds_and_buzzer("Normal")  # Turn off all LEDs and buzzer on exit
+    GPIO.cleanup()
+    sys.exit(0)
+
 # Main function to start threads for heart rate monitoring and display updating
 if __name__ == "__main__":
+    # Register signal handlers for graceful exit
+    signal.signal(signal.SIGTERM, cleanup_and_exit)
+    signal.signal(signal.SIGINT, cleanup_and_exit)
+    
     try:
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
         display_thread = threading.Thread(target=update_display)
@@ -154,6 +166,4 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         print("Monitoring stopped.")
-        running = False
-        set_leds_and_buzzer("Normal")  # Turn off all LEDs and buzzer on exit
-        GPIO.cleanup()
+        cleanup_and_exit(None, None)

@@ -2,82 +2,108 @@ import asyncio
 import websockets
 import json
 import subprocess
-import os
 
-# Define the path to the virtual environment Python interpreter
-VENV_PYTHON = "/home/pi/PatientConditionProject/venv/bin/python3"
+# Function to start a specific systemd service
+def start_service(service_name):
+    """
+    Starts the specified systemd service.
+    """
+    try:
+        subprocess.run(["sudo", "systemctl", "start", service_name], check=True)
+        print(f"Started {service_name} service.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error starting {service_name} service: {e}")
 
-test_app_process = None
+# Function to stop a specific systemd service
+def stop_service(service_name):
+    """
+    Stops the specified systemd service.
+    """
+    try:
+        subprocess.run(["sudo", "systemctl", "stop", service_name], check=True)
+        print(f"Stopped {service_name} service.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error stopping {service_name} service: {e}")
 
+# Function to simulate sending data to the client
+async def send_data(websocket, service_name):
+    """
+    Sends mock data to the client through the WebSocket connection.
+    Replace with real data streaming in production.
+    """
+    last_data = {"status": f"Last data from {service_name}"}  # Placeholder for real data
+    while True:
+        await websocket.send(json.dumps(last_data))  # Send data to the client
+        await asyncio.sleep(1)  # Adjust frequency of data updates
+
+# WebSocket handler to manage incoming commands from the client (Flutter app)
 async def command_handler(websocket, _):
-    global test_app_process
-
+    """
+    Manages WebSocket commands from the client. Handles starting and stopping
+    systemd services based on commands and active page in the app.
+    """
+    active_service = None  # Track the currently active service
     try:
         async for message in websocket:
-            print(f"Received message: {message}")
-            if not message:
-                continue
+            data = json.loads(message)  # Decode the JSON message from the client
+            command = data.get("command")  # Get the command (START/STOP)
+            page = data.get("page")  # Get the page, which specifies the service to control
 
-            try:
-                data = json.loads(message)
-                command = data.get("command")
+            # Map page names from the client to systemd service names
+            service_map = {
+                "BPM": "heart_rate_monitor.service",
+                "Temperature": "temperature_monitor.service",
+                "Stress": "gsr_monitor.service",
+                "Continuous": "test_app.service"
+            }
+            service_name = service_map.get(page)  # Get the service name based on the page
 
-                if command == "START_MONITORING":
-                    print("Start monitoring command received")
-                    # Start `test_app.py` with virtual environment's Python interpreter
-                    if test_app_process is None or test_app_process.poll() is not None:
-                        test_app_process = subprocess.Popen(
-                            [VENV_PYTHON, "test_app.py"],
-                            cwd="/home/pi/PatientConditionProject"
-                        )
-                        await websocket.send(json.dumps({"status": "Monitoring started"}))
-                        print("test_app.py started.")
-                    else:
-                        await websocket.send(json.dumps({"status": "Already running"}))
-                        print("test_app.py is already running.")
+            if command == "START_MONITORING" and service_name:
+                # Start the requested service and send confirmation to the client
+                if active_service:
+                    stop_service(active_service)  # Stop any previously running service
+                start_service(service_name)  # Start the requested service
+                active_service = service_name  # Update active service tracker
+                await websocket.send(json.dumps({"status": f"Started monitoring for {page}"}))
+                await send_data(websocket, service_name)  # Start sending data to the client
 
-                elif command == "STOP_MONITORING":
-                    print("Stop monitoring command received")
-                    # Terminate `test_app.py` if it’s running
-                    if test_app_process and test_app_process.poll() is None:
-                        test_app_process.terminate()
-                        test_app_process = None
-                        await websocket.send(json.dumps({"status": "Monitoring stopped"}))
-                        print("test_app.py stopped.")
-                    else:
-                        await websocket.send(json.dumps({"status": "Not running"}))
-                        print("test_app.py was not running.")
+            elif command == "STOP_MONITORING" and service_name:
+                # Stop the currently running service and confirm to the client
+                stop_service(service_name)
+                active_service = None  # Clear active service tracker
+                await websocket.send(json.dumps({"status": f"Stopped monitoring for {page}"}))
 
-                else:
-                    print("Unknown command received")
-                    await websocket.send(json.dumps({"error": "Unknown command"}))
+            elif command == "EXIT_PAGE" and active_service:
+                # If user navigates away, stop the currently active service
+                stop_service(active_service)
+                active_service = None  # Clear active service tracker
+                await websocket.send(json.dumps({"status": "Exited page, stopped monitoring"}))
 
-            except json.JSONDecodeError:
-                print("Failed to decode JSON, invalid message received.")
-                await websocket.send(json.dumps({"error": "Invalid JSON format"}))
+            else:
+                # Handle unknown commands or unsupported pages
+                await websocket.send(json.dumps({"error": "Unknown command or page"}))
 
     except websockets.ConnectionClosedError:
         print("WebSocket connection closed unexpectedly.")
     except Exception as e:
         print(f"Unexpected error: {e}")
     finally:
-        # Ensure `test_app.py` is terminated if the client disconnects
-        if test_app_process and test_app_process.poll() is None:
-            test_app_process.terminate()
-            test_app_process = None
-            print("test_app.py terminated due to client disconnection.")
+        # Ensure any active service is stopped if the connection is closed
+        if active_service:
+            stop_service(active_service)
 
+# Function to start the WebSocket server
 async def start_server():
+    """
+    Starts the WebSocket server, which listens for incoming connections from the Flutter app.
+    """
     async with websockets.serve(command_handler, "0.0.0.0", 8765):
         print("Command server started on ws://0.0.0.0:8765")
-        await asyncio.Future()  # Run indefinitely
+        await asyncio.Future()  # Keeps the server running indefinitely
 
+# Main entry point for the script
 if __name__ == "__main__":
     try:
-        asyncio.run(start_server())
+        asyncio.run(start_server())  # Start the WebSocket server
     except KeyboardInterrupt:
         print("Server stopped.")
-    finally:
-        if test_app_process:
-            test_app_process.terminate()
-            print("test_app.py terminated due to server shutdown.")
