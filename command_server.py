@@ -36,7 +36,13 @@ async def send_data(websocket, active_page):
                     last_temperature_value = float(f.read().strip())
                 data = {"Temperature": round(last_temperature_value, 3)}  # Send as float with 3 decimal places
             else:
-                data = {}  # No data if there's no active monitoring page
+                # Send the last known values even if the monitoring is stopped
+                if active_page == "BPM":
+                    data = {"BPM": round(last_bpm_value, 3)}
+                elif active_page == "Temperature":
+                    data = {"Temperature": round(last_temperature_value, 3)}
+                else:
+                    data = {}  # No data if there's no active monitoring page
 
             await websocket.send(json.dumps(data))  # Send data to the client
             await asyncio.sleep(1)  # Adjust frequency as needed
@@ -88,11 +94,12 @@ async def command_handler(websocket, _):
             elif command == "STOP_MONITORING" and active_service == service_name:
                 stop_service(service_name)
                 active_service = None
-                active_page = None
-
+                # Do not reset active_page so that the last value can still be displayed
                 # Cancel data streaming task if it exists
                 if data_task:
                     data_task.cancel()
+                    # Restart the task to keep sending the last known value
+                    data_task = asyncio.create_task(send_data(websocket, active_page))
 
                 await websocket.send(json.dumps({"status": f"Stopped monitoring for {page}"}))
 
