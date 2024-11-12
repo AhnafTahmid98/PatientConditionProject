@@ -25,67 +25,55 @@ def stop_service(service_name):
     except subprocess.CalledProcessError as e:
         print(f"Error stopping {service_name} service: {e}")
 
-# Function to simulate sending data to the client
-async def send_data(websocket, service_name):
-    """
-    Sends mock data to the client through the WebSocket connection.
-    Replace this with real data streaming in production.
-    """
-    last_data = {"status": f"Last data from {service_name}"}  # Placeholder for real data
-    while True:
-        await websocket.send(json.dumps(last_data))  # Send data to the client
-        await asyncio.sleep(1)  # Adjust frequency of data updates as needed
-
 # WebSocket handler to manage incoming commands from the client (Flutter app)
 async def command_handler(websocket, _):
     """
-    Manages WebSocket commands from the client, handling start/stop systemd services
-    based on commands and active page in the app.
+    Handles incoming WebSocket messages from the client.
+    Controls starting and stopping systemd services based on the commands
+    received from the client.
     """
-    print("WebSocket connection established")  # New debug line
     active_service = None  # Track the currently active service
 
     try:
         async for message in websocket:
             data = json.loads(message)  # Decode the JSON message from the client
-            command = data.get("command")  # Get the command (START/STOP)
-            page = data.get("page")  # Get the page, which specifies the service to control
-            
-            # Debugging: Print received command and page
+            command = data.get("command")  # Get the command (e.g., START_MONITORING)
+            page = data.get("page")  # Get the page (e.g., BPM)
+
+            # Debugging: Log received command and page for verification
             print(f"Received command: {command} for page: {page}")
 
-            # Map page names from the client to systemd service names
+            # Map page names to systemd service names
             service_map = {
                 "BPM": "heart_rate_monitor.service",
                 "Temperature": "temperature_monitor.service",
                 "Stress": "gsr_monitor.service",
                 "Continuous": "test_app.service"
             }
-            service_name = service_map.get(page)  # Get the service name based on the page
+            service_name = service_map.get(page)  # Determine the service name based on page
 
             if command == "START_MONITORING" and service_name:
                 # Start the requested service if not already active
-                if active_service:
+                if active_service and active_service != service_name:
                     stop_service(active_service)  # Stop any previously running service
-                start_service(service_name)  # Start the requested service
-                active_service = service_name  # Update active service tracker
-                print(f"Started monitoring service: {service_name}")  # Debugging: Confirm service start
+                start_service(service_name)
+                active_service = service_name  # Track the newly active service
+                print(f"Started monitoring service: {service_name}")  # Debugging: Confirm start
                 await websocket.send(json.dumps({"status": f"Started monitoring for {page}"}))
-                await send_data(websocket, service_name)  # Start sending data to the client
 
-            elif command == "STOP_MONITORING" and service_name:
-                # Stop the currently running service and confirm to the client
+            elif command == "STOP_MONITORING" and active_service == service_name:
+                # Stop the currently active service if it matches the requested service
                 stop_service(service_name)
-                active_service = None  # Clear active service tracker
-                print(f"Stopped monitoring service: {service_name}")  # Debugging: Confirm service stop
+                print(f"Stopped monitoring service: {service_name}")  # Debugging: Confirm stop
                 await websocket.send(json.dumps({"status": f"Stopped monitoring for {page}"}))
+                active_service = None  # Clear the active service tracker
 
             elif command == "EXIT_PAGE" and active_service:
-                # If user navigates away, stop the currently active service
+                # Stop the active service if the user navigates away from the page
                 stop_service(active_service)
-                active_service = None  # Clear active service tracker
-                print(f"Exited page, stopped service: {active_service}")  # Debugging: Confirm page exit
+                print(f"Exited page, stopped service: {active_service}")  # Debugging: Confirm exit
                 await websocket.send(json.dumps({"status": "Exited page, stopped monitoring"}))
+                active_service = None  # Clear the active service tracker
 
             else:
                 # Handle unknown commands or unsupported pages
