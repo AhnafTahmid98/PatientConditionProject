@@ -2,9 +2,8 @@ import asyncio
 import websockets
 import json
 import subprocess
-import os
 
-# Global variables to retain the last known values for each metric as float
+# Global variables to retain the last known values for each metric as floats
 last_bpm_value = 0.0
 last_temperature_value = 0.0
 
@@ -22,27 +21,27 @@ def stop_service(service_name):
     except subprocess.CalledProcessError as e:
         print(f"Error stopping {service_name} service: {e}")
 
-# Function to send data for the active page
+# Function to send data based on the active monitoring page
 async def send_data(websocket, active_page):
     global last_bpm_value, last_temperature_value
     while True:
         try:
-            # Send BPM or Temperature data based on the active page
+            # Read and send data for BPM or Temperature based on the active page
             if active_page == "BPM":
                 with open("/home/pi/PatientConditionProject/bpm_data.txt", "r") as f:
                     last_bpm_value = float(f.read().strip())
-                data = {"BPM": round(last_bpm_value, 3)}  # Ensure float with 3 decimal places
+                data = {"BPM": round(last_bpm_value, 3)}  # Send as float with 3 decimal places
             elif active_page == "Temperature":
                 with open("/home/pi/PatientConditionProject/temperature_data.txt", "r") as f:
                     last_temperature_value = float(f.read().strip())
-                data = {"Temperature": round(last_temperature_value, 3)}
+                data = {"Temperature": round(last_temperature_value, 3)}  # Send as float with 3 decimal places
             else:
-                data = {}  # No data if there's no active page
+                data = {}  # No data if there's no active monitoring page
 
             await websocket.send(json.dumps(data))  # Send data to the client
             await asyncio.sleep(1)  # Adjust frequency as needed
         except (FileNotFoundError, ValueError):
-            # Send the last known value if the file read fails
+            # Send the last known value if file read fails
             if active_page == "BPM":
                 await websocket.send(json.dumps({"BPM": round(last_bpm_value, 3)}))
             elif active_page == "Temperature":
