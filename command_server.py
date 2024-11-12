@@ -27,7 +27,7 @@ def stop_service(service_name):
         print(f"Error stopping {service_name} service: {e}")
 
 # Function to send real-time data to the Flutter app
-async def send_data(websocket, service_name):
+async def send_data(websocket):
     while True:
         try:
             # Read the latest BPM data from file
@@ -38,8 +38,7 @@ async def send_data(websocket, service_name):
             bpm_data = {"BPM": 0}  # Default value if file read fails
 
         await websocket.send(json.dumps(bpm_data))  # Send data to Flutter app
-        print(f"Sent data: {bpm_data}")  # Debugging
-        await asyncio.sleep(1)  # Frequency of data updates; adjust as needed 
+        await asyncio.sleep(1)  # Frequency of data updates; adjust as needed
 
 # WebSocket handler to manage incoming commands from the client (Flutter app)
 async def command_handler(websocket, _):
