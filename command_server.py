@@ -2,6 +2,7 @@ import asyncio
 import websockets
 import json
 import subprocess
+import time
 
 # Function to start a specific systemd service
 def start_service(service_name):
@@ -24,6 +25,21 @@ def stop_service(service_name):
         print(f"Stopped {service_name} service.")  # Debugging: Confirm service stop
     except subprocess.CalledProcessError as e:
         print(f"Error stopping {service_name} service: {e}")
+
+# Function to send real-time data to the Flutter app
+async def send_data(websocket, service_name):
+    while True:
+        try:
+            # Read the latest BPM data from file
+            with open("/home/pi/PatientConditionProject/bpm_data.txt", "r") as f:
+                bpm_value = f.read().strip()
+            bpm_data = {"BPM": int(bpm_value)}
+        except (FileNotFoundError, ValueError):
+            bpm_data = {"BPM": 0}  # Default value if file read fails
+
+        await websocket.send(json.dumps(bpm_data))  # Send data to Flutter app
+        print(f"Sent data: {bpm_data}")  # Debugging
+        await asyncio.sleep(1)  # Frequency of data updates; adjust as needed 
 
 # WebSocket handler to manage incoming commands from the client (Flutter app)
 async def command_handler(websocket, _):

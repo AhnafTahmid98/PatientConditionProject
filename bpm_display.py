@@ -91,6 +91,10 @@ def monitor_heart_rate():
                         bpm_history.pop(0)
                     print(f"Heart Rate: {bpm_value:.2f} BPM")
                 
+                # Write the current BPM value to a file
+                with open("/home/pi/PatientConditionProject/bpm_data.txt", "w") as f:
+                    f.write(str(bpm_value))
+                
                 # Update status based on new BPM value
                 update_status()
             time.sleep(0.1)
