@@ -38,7 +38,7 @@ async def send_data(websocket):
             # Read the latest BPM data from file
             with open("/home/pi/PatientConditionProject/bpm_data.txt", "r") as f:
                 bpm_value = f.read().strip()
-            last_bpm_value = int(bpm_value)  # Update the last known BPM value
+            last_bpm_value = float(bpm_value)  # Update the last known BPM value as a float
             bpm_data = {"BPM": last_bpm_value}
         except (FileNotFoundError, ValueError):
             # Use the last known value if file read fails
