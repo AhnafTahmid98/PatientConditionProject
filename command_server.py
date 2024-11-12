@@ -3,8 +3,9 @@ import websockets
 import json
 import subprocess
 
-# Global variable to retain the last known BPM value
-last_bpm_value = 0
+# Global variables to retain the last known BPM and Temperature values
+last_bpm_value = 0.0
+last_temperature_value = 0.0
 
 # Function to start a specific systemd service
 def start_service(service_name):
@@ -27,26 +28,34 @@ def stop_service(service_name):
         print(f"Error stopping {service_name} service: {e}")
 
 # Function to send real-time data to the Flutter app
-async def send_data(websocket):
+async def send_data(websocket, page):
     """
-    Continuously reads BPM data from a file and sends it to the client.
-    Falls back to the last known BPM value if file read fails.
+    Continuously reads data from respective files and sends it to the client.
+    Falls back to the last known values if file read fails.
     """
-    global last_bpm_value  # Reference the last known BPM value
+    global last_bpm_value, last_temperature_value
     while True:
         try:
-            # Read the latest BPM data from file
-            with open("/home/pi/PatientConditionProject/bpm_data.txt", "r") as f:
-                bpm_value = f.read().strip()
-            last_bpm_value = float(bpm_value)  # Update the last known BPM value as a float
-            bpm_data = {"BPM": last_bpm_value}
+            if page == "BPM":
+                with open("/home/pi/PatientConditionProject/bpm_data.txt", "r") as f:
+                    bpm_value = f.read().strip()
+                last_bpm_value = float(bpm_value)  # Update the last known BPM value
+                data = {"BPM": last_bpm_value}
+            elif page == "Temperature":
+                with open("/home/pi/PatientConditionProject/temperature_data.txt", "r") as f:
+                    temperature_value = f.read().strip()
+                last_temperature_value = float(temperature_value)  # Update the last known Temperature value
+                data = {"Temperature": last_temperature_value}
+            else:
+                data = {}
+
         except (FileNotFoundError, ValueError):
             # Use the last known value if file read fails
-            bpm_data = {"BPM": last_bpm_value}
+            data = {"BPM": last_bpm_value} if page == "BPM" else {"Temperature": last_temperature_value}
 
-        await websocket.send(json.dumps(bpm_data))  # Send data to Flutter app
+        await websocket.send(json.dumps(data))  # Send data to Flutter app
         await asyncio.sleep(1)  # Frequency of data updates; adjust as needed
-
+        
 # WebSocket handler for managing incoming commands from the client
 async def command_handler(websocket, _):
     """

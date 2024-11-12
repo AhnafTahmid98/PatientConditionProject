@@ -2,6 +2,8 @@ import time
 import board
 import busio
 import threading
+import signal
+import sys
 from adafruit_ads1x15.ads1115 import ADS1115
 import adafruit_mlx90614
 import adafruit_ssd1306
@@ -29,6 +31,7 @@ oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
 
 # Shared variables
 temperature_value = 0
+temperature_history = []  # Store recent temperature values for graphing
 status = "Normal"
 
 # Data lock for shared resources
@@ -36,7 +39,7 @@ data_lock = threading.Lock()
 running = True
 
 # Temperature threshold settings
-HUMAN_TEMP_RANGE = (35.8, 38.0)  # Typical human body temperature range in °C
+HUMAN_TEMP_RANGE = (35.8, 40.0)  # Typical human body temperature range in °C
 HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
 MAX_ATTEMPTS = 3
 
@@ -46,6 +49,17 @@ def set_leds_and_buzzer(status):
     GPIO.output(yellow_led, GPIO.HIGH if status == "Warning" else GPIO.LOW)
     GPIO.output(red_led, GPIO.HIGH if status == "Critical" else GPIO.LOW)
     GPIO.output(buzzer_pin, GPIO.HIGH if status == "Critical" else GPIO.LOW)
+
+# Update status based on BPM value
+def update_status():
+    global status
+    if temperature_value > 39:
+        status = "Critical"
+    elif temperature_value > 37.8:
+        status = "Warning"
+    else:
+        status = "Normal"
+    set_leds_and_buzzer(status)
 
 # Function to dynamically adjust temperature threshold based on ambient temperature
 def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
@@ -66,26 +80,31 @@ def monitor_temperature():
 
     while running:
         object_temp = get_stable_temperature(mlx)
-        dynamic_threshold = get_dynamic_threshold(mlx.ambient_temperature)
-
-        # Check if object temperature falls within the human temperature range and exceeds dynamic threshold
-        if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
-            temperature_value = object_temp
-            status = "Normal" if object_temp <= 37 else "Warning" if object_temp <= 38 else "Critical"
-            no_detection_count = 0
-        else:
-            temperature_value = 0
-            status = "No detection"
-            no_detection_count += 1
-
-        set_leds_and_buzzer(status)  # Update LED and buzzer based on status
-
-        if no_detection_count >= MAX_ATTEMPTS:
-            HUMAN_TEMP_THRESHOLD_OFFSET += 0.1
-            no_detection_count = 0
+        dynamic_threshold = mlx.ambient_temperature + HUMAN_TEMP_THRESHOLD_OFFSET
 
         with data_lock:
-            print(f"Temperature: {temperature_value:.2f}°C, Status: {status}")
+            if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
+                temperature_value = object_temp
+                print(f"Human Body Temperature: {temperature_value:.2f}°C")
+                # Write temperature to file for external reading
+                with open("/home/pi/PatientConditionProject/temperature_data.txt", "w") as f:
+                    f.write(f"{temperature_value:.3f}")
+
+                # Append temperature value to history for graphing
+                temperature_history.append(temperature_value)
+                if len(temperature_history) > 20:  # Limit the history length
+                    temperature_history.pop(0)
+                no_detection_count = 0
+            else:
+                no_detection_count += 1
+                temperature_value = 0
+                print("No human body detected.")
+
+            if no_detection_count >= MAX_ATTEMPTS:
+                HUMAN_TEMP_THRESHOLD_OFFSET += 0.1
+                no_detection_count = 0
+
+        update_status()
         time.sleep(1)
 
 # OLED Display function to show temperature and status
@@ -103,6 +122,23 @@ def update_display():
             
             # Display Temperature and Status
             draw.text((0, 0), f"Temp: {temperature_value:.1f}°C", font=font, fill=255)
+
+            # Draw the temperature graph
+            if temperature_history:
+                max_temp = max(temperature_history) if max(temperature_history) > 0 else 1
+                min_temp = min(temperature_history)
+                graph_height = 8
+                graph_width = 60
+                x_start = 50
+                y_start = 0
+
+                for i in range(1, len(temperature_history)):
+                    y1 = y_start + graph_height - int((temperature_history[i-1] - min_temp) / (max_temp - min_temp) * graph_height)
+                    y2 = y_start + graph_height - int((temperature_history[i] - min_temp) / (max_temp - min_temp) * graph_height)
+                    x1 = x_start + (i - 1) * (graph_width // (len(temperature_history) - 1))
+                    x2 = x_start + i * (graph_width // (len(temperature_history) - 1))
+                    draw.line((x1, y1, x2, y2), fill=255, width=1)
+
             draw.text((0, 16), f"Status: {status}", font=font, fill=255)
 
             # Update OLED display
@@ -111,8 +147,20 @@ def update_display():
         
         time.sleep(1.5)
 
+# Graceful exit for systemd service
+def cleanup_and_exit(signum, frame):
+    global running
+    running = False
+    set_leds_and_buzzer("Normal")  # Turn off all LEDs and buzzer on exit
+    GPIO.cleanup()
+    sys.exit(0)
+
 # Main function to start monitoring and display threads
 if __name__ == "__main__":
+    # Register signal handlers for graceful exit
+    signal.signal(signal.SIGTERM, cleanup_and_exit)
+    signal.signal(signal.SIGINT, cleanup_and_exit)
+    
     try:
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
@@ -124,7 +172,4 @@ if __name__ == "__main__":
         display_thread.join()
 
     except KeyboardInterrupt:
-        print("Monitoring stopped.")
-        running = False
-        set_leds_and_buzzer("Normal")  # Turn off all LEDs and buzzer on exit
-        GPIO.cleanup()
+        cleanup_and_exit(None, None)
