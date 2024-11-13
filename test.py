@@ -262,15 +262,15 @@ def cleanup_and_exit(signum, frame):
     global running
     running = False
     GPIO.setmode(GPIO.BCM)  # Set pin numbering mode if needed
-    
-    # Only turn off LEDs and buzzer without full cleanup
+
+    # Turn off LEDs and buzzer
     GPIO.output(GREEN_LED, GPIO.LOW)
     GPIO.output(YELLOW_LED, GPIO.LOW)
     GPIO.output(RED_LED, GPIO.LOW)
     GPIO.output(BUZZER_PIN, GPIO.LOW)
     
     print("Exiting gracefully.")
-    sys.exit(0)
+    time.sleep(1)  # Small delay to ensure threads exit
 
 # Main function
 if __name__ == "__main__":
@@ -288,6 +288,7 @@ if __name__ == "__main__":
         gsr_thread.start()
         display_thread.start()
 
+        # Join threads to ensure all threads exit gracefully
         heart_rate_thread.join()
         temperature_thread.join()
         gsr_thread.join()
