@@ -13,9 +13,7 @@ import adafruit_mlx90614
 import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
-import asyncio
-import websockets
-import json
+import signal
 
 # Load environment variables from .env file
 load_dotenv()
@@ -330,8 +328,17 @@ def update_display():
             print(f"Unexpected error in OLED display: {e}")
             time.sleep(1)
 
+# Signal handler to stop all threads
+def signal_handler(sig, frame):
+    global running
+    running = False
+    print("Exiting gracefully...")
+
 # Main function
 if __name__ == "__main__":
+    # Attach signal handler for SIGINT (Ctrl+C)
+    signal.signal(signal.SIGINT, signal_handler)
+    
     heart_rate_thread = threading.Thread(target=monitor_heart_rate)
     gsr_thread = threading.Thread(target=monitor_gsr)
     temperature_thread = threading.Thread(target=monitor_temperature)
