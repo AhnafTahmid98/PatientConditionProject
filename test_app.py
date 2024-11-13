@@ -323,38 +323,32 @@ def update_display():
             print(f"Unexpected error in OLED display: {e}")
             time.sleep(1)
 
-# Graceful exit for systemd service
+# Graceful exit function for handling shutdown signals
 def cleanup_and_exit(signum, frame):
     global running
     running = False
-
-    # Ensure GPIO mode is set and directly set outputs to LOW
-    GPIO.setmode(GPIO.BCM)
     GPIO.output(GREEN_LED, GPIO.LOW)
     GPIO.output(YELLOW_LED, GPIO.LOW)
     GPIO.output(RED_LED, GPIO.LOW)
     GPIO.output(BUZZER_PIN, GPIO.LOW)
-    
     GPIO.cleanup()
     print("Exiting gracefully...")
     sys.exit(0)
 
 # Main function
 if __name__ == "__main__":
-
-    # Register signal handlers for graceful exit
     signal.signal(signal.SIGTERM, cleanup_and_exit)
     signal.signal(signal.SIGINT, cleanup_and_exit)
-    
+
     try:
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
         gsr_thread = threading.Thread(target=monitor_gsr)
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
-        
+
         heart_rate_thread.start()
-        temperature_thread.start()
         gsr_thread.start()
+        temperature_thread.start()
         display_thread.start()
 
         heart_rate_thread.join()
@@ -366,6 +360,6 @@ if __name__ == "__main__":
         print("Monitoring stopped.")
         cleanup_and_exit(None, None)
     
-    sys.exit(0)  # Exit the program cleanly at the end
+    sys.exit(0)
     
     
