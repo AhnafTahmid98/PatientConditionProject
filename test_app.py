@@ -330,7 +330,7 @@ def cleanup_and_exit(signum, frame):
     GPIO.setmode(GPIO.BCM)  # Ensure GPIO mode is set before cleanup
     set_leds_and_buzzer("Normal", False)  # Turn off all LEDs and buzzer on exit
     GPIO.cleanup()
-    sys.exit(0)
+    print("Exiting gracefully...")
 
 # Main function
 if __name__ == "__main__":
@@ -340,16 +340,11 @@ if __name__ == "__main__":
     signal.signal(signal.SIGINT, cleanup_and_exit)
     
     try:
-        
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
         gsr_thread = threading.Thread(target=monitor_gsr)
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
-
-        # Wait until 'running' is True before starting threads
-        while not running:
-            time.sleep(0.1)
-
+        
         # Start threads
         heart_rate_thread.start()
         temperature_thread.start()
@@ -365,5 +360,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Monitoring stopped.")
         cleanup_and_exit(None, None)
+    
+    sys.exit(0)  # Exit the program cleanly at the end
     
     
