@@ -14,6 +14,7 @@ import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
 import signal
+import sys
 
 # Load environment variables from .env file
 load_dotenv()
@@ -328,36 +329,42 @@ def update_display():
             print(f"Unexpected error in OLED display: {e}")
             time.sleep(1)
 
-# Signal handler to stop all threads
-def signal_handler(sig, frame):
+# Graceful exit for systemd service
+def cleanup_and_exit(signum, frame):
     global running
     running = False
-    print("Exiting gracefully...")
+    set_leds_and_buzzer("Normal")  # Turn off all LEDs and buzzer on exit
+    GPIO.cleanup()
+    sys.exit(0)
 
 # Main function
 if __name__ == "__main__":
-    # Attach signal handler for SIGINT (Ctrl+C)
-    signal.signal(signal.SIGINT, signal_handler)
+
+    # Register signal handlers for graceful exit
+    signal.signal(signal.SIGTERM, cleanup_and_exit)
+    signal.signal(signal.SIGINT, cleanup_and_exit)
     
-    heart_rate_thread = threading.Thread(target=monitor_heart_rate)
-    gsr_thread = threading.Thread(target=monitor_gsr)
-    temperature_thread = threading.Thread(target=monitor_temperature)
-    display_thread = threading.Thread(target=update_display)
+    try:
+        
+        heart_rate_thread = threading.Thread(target=monitor_heart_rate)
+        gsr_thread = threading.Thread(target=monitor_gsr)
+        temperature_thread = threading.Thread(target=monitor_temperature)
+        display_thread = threading.Thread(target=update_display)
 
-    # Start threads
-    heart_rate_thread.start()
-    temperature_thread.start()
-    gsr_thread.start()
-    display_thread.start()
+        # Start threads
+        heart_rate_thread.start()
+        temperature_thread.start()
+        gsr_thread.start()
+        display_thread.start()
 
+        # Ensure threads complete before exiting
+        heart_rate_thread.join()
+        gsr_thread.join()
+        temperature_thread.join()
+        display_thread.join()
 
-    # Ensure threads complete before exiting
-    heart_rate_thread.join()
-    gsr_thread.join()
-    temperature_thread.join()
-    display_thread.join()
-
-    GPIO.cleanup()
-    print("Cleaned up resources.")
+    except KeyboardInterrupt:
+        print("Monitoring stopped.")
+        cleanup_and_exit(None, None)
     
     
