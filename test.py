@@ -118,7 +118,7 @@ def set_leds_and_buzzer(status, interaction):
 
 # Update status and trigger alerts if necessary
 def update_status():
-    global status, consecutive_warning_with_human, consecutive_critical_with_human
+    global status, email_count, consecutive_warning_with_human, consecutive_critical_with_human
     human_present = human_interaction and temperature_value >= HUMAN_TEMP_RANGE[0]
     if human_present:
         if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 39:
@@ -180,7 +180,7 @@ def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
 
 # Temperature Monitoring
 def monitor_temperature():
-    global temperature_value
+    global temperature_value, HUMAN_TEMP_THRESHOLD_OFFSET
     no_detection_count = 0
     while running:
         try:
@@ -261,6 +261,7 @@ def update_display():
 def cleanup_and_exit(signum, frame):
     global running
     running = False
+    GPIO.setmode(GPIO.BCM)  # Set pin numbering mode here to avoid runtime error
     set_leds_and_buzzer("Normal", False)  # Turn off all LEDs and buzzer on exit
     GPIO.cleanup()
     sys.exit(0)
