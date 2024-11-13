@@ -327,7 +327,7 @@ def update_display():
 def cleanup_and_exit(signum, frame):
     global running
     running = False
-    set_leds_and_buzzer("Normal")  # Turn off all LEDs and buzzer on exit
+    set_leds_and_buzzer("Normal", False)  # Turn off all LEDs and buzzer on exit
     GPIO.cleanup()
     sys.exit(0)
 
@@ -348,7 +348,7 @@ if __name__ == "__main__":
         # Wait until 'running' is True before starting threads
         while not running:
             time.sleep(0.1)
-            
+
         # Start threads
         heart_rate_thread.start()
         temperature_thread.start()
