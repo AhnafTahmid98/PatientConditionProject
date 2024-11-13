@@ -33,6 +33,7 @@ oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
 bpm_value = 0
 status = "Normal"
 bpm_history = []  # For storing recent BPM values for graphing
+human_interaction = False  # Tracks if human interaction is detected
 
 # Heart rate thresholds and variables
 high_threshold = 2.5  # Voltage thresholds for pulse detection
@@ -40,8 +41,8 @@ low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
 
-# Threshold for human interaction with BPM sensor
-human_interaction_threshold = 1  # Adjust this based on observations
+# GSR threshold for detecting human interaction
+gsr_human_threshold = 13000  # Adjust based on your observations
 
 # Lock for synchronizing data access
 data_lock = threading.Lock()
@@ -69,17 +70,25 @@ def update_status():
         status = "Normal"
     set_leds_and_buzzer(status)
 
-# Heart Rate Monitoring with Human Interaction Check
+# Function to check human interaction using GSR sensor
+def check_human_interaction():
+    chan_gsr = AnalogIn(adc, 1)
+    gsr_value = chan_gsr.value
+    return gsr_value < gsr_human_threshold  # Returns True if human interaction detected
+
+# Heart Rate Monitoring
 def monitor_heart_rate():
-    global bpm_value, bpm_history, last_pulse_time, first_pulse, running
+    global bpm_value, bpm_history, last_pulse_time, first_pulse, running, human_interaction
     while running:
         try:
-            chan_heart_rate = AnalogIn(adc, 0)
-            voltage = chan_heart_rate.voltage
-            current_time = time.time()
+            # Check for human interaction with GSR sensor
+            human_interaction = check_human_interaction()
             
-            # Check for human interaction based on voltage threshold
-            if voltage > human_interaction_threshold:  # Only measure BPM if human interaction is detected
+            if human_interaction:  # Only measure BPM if human interaction is detected
+                chan_heart_rate = AnalogIn(adc, 0)
+                voltage = chan_heart_rate.voltage
+                current_time = time.time()
+                
                 # Detecting the pulse
                 if voltage > high_threshold and first_pulse:
                     last_pulse_time = current_time
@@ -144,8 +153,9 @@ def update_display():
                     x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
                     draw.line((x1, y1, x2, y2), fill=255, width=1)
 
-            # Display LED Status
+            # Display LED Status and Human Interaction
             draw.text((0, 12), f"Status: {status}", font=font, fill=255)
+            draw.text((0, 24), f"Interaction: {'Yes' if human_interaction else 'No'}", font=font, fill=255)
 
             # Update OLED display
             oled.image(image)
