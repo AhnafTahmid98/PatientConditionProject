@@ -83,7 +83,6 @@ high_threshold = 2.5
 low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
-bpm_history = []  # For storing recent BPM values for graphing
 
 # BPM thresholds for status levels
 normal_bpm_range = (60, 100)
@@ -309,23 +308,7 @@ def update_display():
                 
                 # Display BPM value
                 draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
-                
-                # Draw BPM history graph if available
-                if bpm_history:
-                    max_bpm = max(bpm_history) if max(bpm_history) > 0 else 1
-                    min_bpm = min(bpm_history)
-                    graph_height = 8
-                    graph_width = 60
-                    x_start = 50
-                    y_start = 2
-
-                    for i in range(1, len(bpm_history)):
-                        y1 = y_start + graph_height - int((bpm_history[i-1] - min_bpm) / (max_bpm - min_bpm) * graph_height)
-                        y2 = y_start + graph_height - int((bpm_history[i] - min_bpm) / (max_bpm - min_bpm) * graph_height)
-                        x1 = x_start + (i - 1) * (graph_width // (len(bpm_history) - 1))
-                        x2 = x_start + i * (graph_width // (len(bpm_history) - 1))
-                        draw.line((x1, y1, x2, y2), fill=255, width=1)
-
+    
                 # Display temperature and stress level
                 draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
                 draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
@@ -346,44 +329,8 @@ def update_display():
             print(f"Unexpected error in OLED display: {e}")
             time.sleep(1)
 
-# WebSocket handler for streaming data
-async def websocket_handler(websocket, _):
-    global websocket_running, monitoring_task
-    async def send_data():
-        while websocket_running:
-            data = {"bpm": bpm_value, "temperature": temperature_value, "stress_level": stress_level}
-            await websocket.send(json.dumps(data))
-            # Save the last measurement
-            with open(LAST_DATA_FILE, "w") as f:
-                json.dump(data, f)
-            await asyncio.sleep(0.5)
-    async for message in websocket:
-        command = json.loads(message).get("command")
-        if command == "START_MONITORING":
-            if not websocket_running:
-                websocket_running = True
-                monitoring_task = asyncio.create_task(send_data())
-                await websocket.send(json.dumps({"status": "Monitoring started"}))
-        elif command == "STOP_MONITORING":
-            websocket_running = False
-            if monitoring_task:
-                monitoring_task.cancel()
-                monitoring_task = None
-            await websocket.send(json.dumps({"status": "Monitoring stopped"}))
-
-# Start WebSocket server
-def start_websocket_server():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    server = websockets.serve(websocket_handler, "0.0.0.0", 8766)
-    loop.run_until_complete(server)
-    loop.run_forever()
-
 # Main function
 if __name__ == "__main__":
-    websocket_thread = threading.Thread(target=start_websocket_server)
-    websocket_thread.start()
-
     heart_rate_thread = threading.Thread(target=monitor_heart_rate)
     gsr_thread = threading.Thread(target=monitor_gsr)
     temperature_thread = threading.Thread(target=monitor_temperature)
