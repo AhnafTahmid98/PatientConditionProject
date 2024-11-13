@@ -1,84 +1,46 @@
-import os
 import time
 import board
 import busio
 import threading
-import smtplib
-from dotenv import load_dotenv
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import signal
+import sys
 from adafruit_ads1x15.ads1115 import ADS1115
 from adafruit_ads1x15.analog_in import AnalogIn
 import adafruit_mlx90614
 import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
-import signal
-import sys
-
-# Load environment variables from .env file
-load_dotenv()
-
-# Retrieve email credentials from environment
-EMAIL_USER = os.getenv("EMAIL_USER")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-TO_EMAIL = os.getenv("TO_EMAIL")
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT"))
 
 # LED and buzzer pin definitions
-GREEN_LED = 17  # GPIO 17
-YELLOW_LED = 27  # GPIO 27
-RED_LED = 22  # GPIO 22
-BUZZER_PIN = 23  # GPIO 23
-
-# Clean up GPIO before setting up
-GPIO.cleanup()
+green_led = 17  # GPIO 17
+yellow_led = 27  # GPIO 27
+red_led = 22    # GPIO 22
+buzzer_pin = 23 # GPIO 23
 
 # GPIO setup for LEDs and buzzer
 GPIO.setmode(GPIO.BCM)
-GPIO.setup(GREEN_LED, GPIO.OUT)
-GPIO.setup(YELLOW_LED, GPIO.OUT)
-GPIO.setup(RED_LED, GPIO.OUT)
-GPIO.setup(BUZZER_PIN, GPIO.OUT)
-
-# Initialize LEDs and buzzer to OFF
-GPIO.output(GREEN_LED, GPIO.LOW)
-GPIO.output(YELLOW_LED, GPIO.LOW)
-GPIO.output(RED_LED, GPIO.LOW)
-GPIO.output(BUZZER_PIN, GPIO.LOW)
+GPIO.setup(green_led, GPIO.OUT)
+GPIO.setup(yellow_led, GPIO.OUT)
+GPIO.setup(red_led, GPIO.OUT)
+GPIO.setup(buzzer_pin, GPIO.OUT)
 
 # Initialize I2C bus and sensors
 i2c = busio.I2C(board.SCL, board.SDA)
 adc = ADS1115(i2c, address=0x48)
-adc.gain = 1
 mlx = adafruit_mlx90614.MLX90614(i2c, address=0x5a)
 oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
 
-# Save Senors data
-LAST_DATA_FILE = "/home/pi/PatientConditionProject/last_measurement.json"
-
 # Shared variables
 bpm_value = 0
-temperature_value = 0
-stress_level = "None"
 status = "Normal"
+bpm_history = []  # For storing recent BPM values for graphing
+temperature_value = 0
+temperature_history = []  # Store recent temperature values for graphing
+stress_level = "None"
 human_interaction = False
-email_count = 0
-email_sent_display = False
-
-# Flags for control
-running = True  # Controls the monitoring threads
-websocket_running = False  # Controls WebSocket data transmission
-
-# Global variable to store the monitoring task- websocket
-monitoring_task = None
-
-# Data lock
-data_lock = threading.Lock()
 
 # Heart rate thresholds and variables
-high_threshold = 2.5
+high_threshold = 2.5  # Voltage thresholds for pulse detection
 low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
@@ -87,116 +49,81 @@ first_pulse = True
 normal_bpm_range = (60, 100)
 warning_bpm_range = (50, 120)
 
-# Thresholds and Variables for GSR
-BASELINE_VALUE = 11000
-RELAXED_THRESHOLD = BASELINE_VALUE * 0.9
-NORMAL_THRESHOLD = BASELINE_VALUE * 1.1
-ELEVATED_THRESHOLD = BASELINE_VALUE * 1.3
-
-# Thresholds and Variables for Temperature
-HUMAN_TEMP_RANGE = (35.8, 40.0)
+# Temperature threshold settings
+HUMAN_TEMP_RANGE = (35.8, 40.0)  # Typical human body temperature range in °C
 HUMAN_TEMP_THRESHOLD_OFFSET = 2.5
 MAX_ATTEMPTS = 3
 
-# Function to send an email alert
-def send_email_alert(status):
-    global email_count, email_sent_display
-    if email_count >= 5:
-        return  # Limit to 5 emails
+# Thresholds for GSR
+baseline_value = 11000
+relaxed_threshold = baseline_value * 0.9
+normal_threshold = baseline_value * 1.1
+elevated_threshold = baseline_value * 1.3
+GSR_AVERAGE_COUNT = 10  # Number of GSR readings to average for interaction check
 
-    try:
-        subject = f"Health Alert: {status} Condition Detected"
-        body = f"The health monitoring system has detected a {status} condition.\n\n"
-        body += f"Current Readings:\n- BPM: {bpm_value}\n- Temperature: {temperature_value}°C\n- Stress Level: {stress_level}"
+# Flag to check if cleanup has already been done
+cleaned_up = False
 
-        # Set up the email message
-        msg = MIMEMultipart()
-        msg["From"] = EMAIL_USER
-        msg["To"] = TO_EMAIL
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
+# Lock for synchronizing data access
+data_lock = threading.Lock()
+running = True
 
-        # Send the email
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(EMAIL_USER, EMAIL_PASSWORD)
-            server.sendmail(EMAIL_USER, TO_EMAIL, msg.as_string())
-        email_count += 1
-        email_sent_display = True
-        print(f"Alert email sent for {status} condition.")
-
-    except Exception as e:
-        print(f"Failed to send email: {e}")
-
-# Function to control LEDs and buzzer based on status
+# Function to control LEDs and buzzer based on status and interaction status
 def set_leds_and_buzzer(status, interaction):
-    if status == "Normal":
-        GPIO.output(GREEN_LED, GPIO.HIGH)
-        GPIO.output(YELLOW_LED, GPIO.LOW)
-        GPIO.output(RED_LED, GPIO.LOW)
-        GPIO.output(BUZZER_PIN, GPIO.LOW)
-    elif status == "Warning":
-        GPIO.output(GREEN_LED, GPIO.LOW)
-        GPIO.output(YELLOW_LED, GPIO.HIGH)
-        GPIO.output(RED_LED, GPIO.LOW)
-        GPIO.output(BUZZER_PIN, GPIO.LOW)
-    elif status == "Critical" and interaction:
-        GPIO.output(GREEN_LED, GPIO.LOW)
-        GPIO.output(YELLOW_LED, GPIO.LOW)
-        GPIO.output(RED_LED, GPIO.HIGH)
-        GPIO.output(BUZZER_PIN, GPIO.HIGH)
+    if interaction:  # Only trigger LEDs and buzzer if human interaction is detected
+        if status == "Normal":
+            GPIO.output(green_led, GPIO.HIGH)
+            GPIO.output(yellow_led, GPIO.LOW)
+            GPIO.output(red_led, GPIO.LOW)
+            GPIO.output(buzzer_pin, GPIO.LOW)
+        elif status == "Warning":
+            GPIO.output(green_led, GPIO.LOW)
+            GPIO.output(yellow_led, GPIO.HIGH)
+            GPIO.output(red_led, GPIO.LOW)
+            GPIO.output(buzzer_pin, GPIO.LOW)
+        elif status == "Critical":
+            GPIO.output(green_led, GPIO.LOW)
+            GPIO.output(yellow_led, GPIO.LOW)
+            GPIO.output(red_led, GPIO.HIGH)
+            GPIO.output(buzzer_pin, GPIO.HIGH)
     else:
-        GPIO.output(GREEN_LED, GPIO.LOW)
-        GPIO.output(YELLOW_LED, GPIO.LOW)
-        GPIO.output(RED_LED, GPIO.LOW)
-        GPIO.output(BUZZER_PIN, GPIO.LOW)
+        # Turn off all LEDs and buzzer if there is no human interaction
+        GPIO.output(green_led, GPIO.LOW)
+        GPIO.output(yellow_led, GPIO.LOW)
+        GPIO.output(red_led, GPIO.LOW)
+        GPIO.output(buzzer_pin, GPIO.LOW)
 
-# Initialize counters for consecutive "Warning" and "Critical" readings with human presence
-consecutive_warning_with_human = 0
-consecutive_critical_with_human = 0
-required_consecutive_count = 5  # Number of consecutive readings required to trigger an email
-
-# Update status based on BPM, GSR, and Temperature, and check for human presence
+# Update status based on BPM, GSR, and Temperature using ranges
 def update_status():
-    global status, email_count, consecutive_warning_with_human, consecutive_critical_with_human
-
-    # Check human presence and update status
-    human_present = human_interaction and temperature_value >= HUMAN_TEMP_RANGE[0]
-    if human_present:
-        if bpm_value < 50 or bpm_value > 120 or stress_level == "High" or temperature_value > 39:
+    global status
+    if human_interaction:
+        # Status is "Critical" only if BPM, stress level, or temperature are out of range
+        if bpm_value < warning_bpm_range[0] or bpm_value > warning_bpm_range[1] or stress_level == "High" or temperature_value > 39:
             status = "Critical"
-            consecutive_critical_with_human += 1
-            consecutive_warning_with_human = 0
-        elif (50 <= bpm_value < 60 or 100 < bpm_value <= 120) or stress_level == "Elevated" or temperature_value > 37.8:
+        elif bpm_value < normal_bpm_range[0] or bpm_value > normal_bpm_range[1] or stress_level == "Elevated" or temperature_value > 38.7:
             status = "Warning"
-            consecutive_warning_with_human += 1
-            consecutive_critical_with_human = 0
         else:
             status = "Normal"
-            consecutive_critical_with_human = 0
-            consecutive_warning_with_human = 0
-            email_count = 0  # Reset email count on return to Normal
-
-        # Only send email if threshold count is met for human-related warning or critical status
-        if status == "Critical" and consecutive_critical_with_human >= required_consecutive_count:
-            send_email_alert(status)
-            consecutive_critical_with_human = 0
-        elif status == "Warning" and consecutive_warning_with_human >= required_consecutive_count:
-            send_email_alert(status)
-            consecutive_warning_with_human = 0
-
-    # Ensure LEDs and buzzer reflect current status
+    else:
+        # No human interaction: force "Normal" status
+        status = "Normal"
+    
+    # Print status if it’s "Warning" or "Critical"
+    if status != "Normal":
+        print(f"Status: {status}, BPM: {bpm_value:.2f}, Temperature: {temperature_value:.2f}C, Stress Level: {stress_level}")
+    
     set_leds_and_buzzer(status, human_interaction)
 
 # Heart Rate Monitoring
 def monitor_heart_rate():
-    global bpm_value, last_pulse_time, first_pulse, bpm_history
+    global bpm_value, bpm_history, last_pulse_time, first_pulse, running
     while running:
         try:
             chan_heart_rate = AnalogIn(adc, 0)
             voltage = chan_heart_rate.voltage
             current_time = time.time()
-
+            
+            # Detecting the pulse
             if voltage > high_threshold and first_pulse:
                 last_pulse_time = current_time
                 first_pulse = False
@@ -204,162 +131,167 @@ def monitor_heart_rate():
                 pulse_interval = (current_time - last_pulse_time) * 1000  # Convert to milliseconds
                 bpm_value = 60000 / pulse_interval
                 last_pulse_time = current_time
-                print(f"Heart Rate: {bpm_value:.2f} BPM")
+
+                # Update BPM history for graphing
+                with data_lock:
+                    bpm_history.append(bpm_value)
+                    if len(bpm_history) > 20:  # Limit history length
+                        bpm_history.pop(0)
+                    print(f"Heart Rate: {bpm_value:.2f} BPM")
+                with open("/home/pi/PatientConditionProject/bpm_data.txt", "w") as f:
+                    f.write(str(bpm_value))
+
+                # Update status based on new BPM value
                 update_status()
             time.sleep(0.1)
         except OSError:
             print("Heart Rate error, reinitializing...")
             time.sleep(1)
 
-# Function to get a stable temperature reading by averaging multiple readings
+# Function to dynamically adjust temperature threshold based on ambient temperature
+def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
+    return ambient_temp + offset
+
+# Function to get stable temperature reading
 def get_stable_temperature(sensor, readings=20):
     temp_sum = 0
     for _ in range(readings):
         temp_sum += sensor.object_temperature
-        time.sleep(0.02)  # Small delay between readings
+        time.sleep(0.02)
     return temp_sum / readings
 
-# Function to calculate the dynamic temperature threshold based on ambient temperature
-def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
-    return ambient_temp + offset
-
-# Temperature Monitoring
+# Temperature monitoring function
 def monitor_temperature():
-    global temperature_value, HUMAN_TEMP_THRESHOLD_OFFSET
+    global temperature_value, status, HUMAN_TEMP_THRESHOLD_OFFSET
     no_detection_count = 0
-    while running:
-        try:
-            object_temp = get_stable_temperature(mlx)  # Call the defined function
-            dynamic_threshold = get_dynamic_threshold(mlx.ambient_temperature)
 
+    while running:
+        object_temp = get_stable_temperature(mlx)
+        dynamic_threshold = mlx.ambient_temperature + HUMAN_TEMP_THRESHOLD_OFFSET
+
+        with data_lock:
             if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
                 temperature_value = object_temp
-                with data_lock:
-                    print(f"Human Body Temperature: {temperature_value:.2f}°C")
+                print(f"Human Body Temperature: {temperature_value:.2f}°C")
+                # Write temperature to file for external reading
+                with open("/home/pi/PatientConditionProject/temperature_data.txt", "w") as f:
+                    f.write(f"{temperature_value:.3f}")
+
+                # Append temperature value to history for graphing
+                temperature_history.append(temperature_value)
+                if len(temperature_history) > 20:  # Limit the history length
+                    temperature_history.pop(0)
                 no_detection_count = 0
             else:
                 no_detection_count += 1
-                with data_lock:
-                    temperature_value = 0
-                    print("No human body detected.")
+                temperature_value = 0
+                print("No human body detected.")
 
             if no_detection_count >= MAX_ATTEMPTS:
                 HUMAN_TEMP_THRESHOLD_OFFSET += 0.1
                 no_detection_count = 0
-            time.sleep(1)
-        except Exception as e:
-            print(f"Unexpected error in temperature monitoring: {e}")
-            time.sleep(1)
+
+        update_status()
+        time.sleep(1)
+
+# Function to determine stress level based on GSR reading
+def determine_stress_level(gsr_value):
+    global human_interaction
+    if gsr_value < 13000:  # Threshold for human interaction
+        human_interaction = True
+        if gsr_value < relaxed_threshold:
+            return "Relaxed"
+        elif gsr_value < normal_threshold:
+            return "Normal"
+        elif gsr_value < elevated_threshold:
+            return "Elevated"
+        else:
+            return "High"
+    else:
+        human_interaction = False
+        return "NO-CONTACT"
 
 # GSR Monitoring
 def read_gsr():
     chan_gsr = AnalogIn(adc, 1)
     return chan_gsr.value
 
-def determine_stress_level(gsr_value):
-    global human_interaction
-    if gsr_value < 13000:
-        human_interaction = True
-        if gsr_value < RELAXED_THRESHOLD:
-            return "Relexed"
-        elif gsr_value < NORMAL_THRESHOLD:
-            return "Normal"
-        elif gsr_value < ELEVATED_THRESHOLD:
-            return "Elevated"
-        else:
-            return "High"
-    else:
-        human_interaction = False
-        return "No-contact"
-
 def monitor_gsr():
-    global stress_level
+    global stress_level, human_interaction
     while running:
         try:
-            gsr_value = read_gsr()
-            stress_level = determine_stress_level(gsr_value)
-            print(f"GSR Value: {gsr_value}, Stress Level: {stress_level}, Interaction: {human_interaction}")
-            update_status()
+            # Average multiple GSR readings to confirm interaction
+            gsr_readings = [read_gsr() for _ in range(GSR_AVERAGE_COUNT)]
+            avg_gsr = sum(gsr_readings) / GSR_AVERAGE_COUNT
+            stress_level = determine_stress_level(avg_gsr)
+            with data_lock:
+                print(f"GSR Avg: {avg_gsr:.2f}, Stress Level: {stress_level}, Interaction: {human_interaction}")
+            with open("/home/pi/PatientConditionProject/gsr_data.txt", "w") as f:
+                f.write(stress_level)
             time.sleep(3)
         except OSError:
             print("GSR error, reinitializing...")
             time.sleep(1)
-        
-# OLED Display Thread
+            
+# OLED Display Thread with Compact Layout for 128x32 Display
 def update_display():
-    global email_sent_display
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 9)  # Compact font
     except IOError:
         font = ImageFont.load_default()
     
     while running:
-        try:
-            with data_lock:
-                # Create a new image with a 1-bit color format for the OLED display
-                image = Image.new("1", (128, 32))
-                draw = ImageDraw.Draw(image)
-                
-                # Display BPM value
-                draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
-    
-                # Display temperature and stress level
-                draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
-                draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
-                
-                # Display "Email Sent" if flag is set
-                if email_sent_display:
-                    draw.text((80, 22), "Email Sent", font=font, fill=255)
-
-                # Show the image on the OLED display
-                oled.image(image)
-                oled.show()
+        with data_lock:
+            image = Image.new("1", (128, 32))
+            draw = ImageDraw.Draw(image)
+            draw.text((0, 0), f"BPM: {bpm_value:.1f}", font=font, fill=255)
+            draw.text((0, 12), f"Temp.: {temperature_value:.1f}C", font=font, fill=255)
+            draw.text((0, 22), f"Stress: {stress_level}", font=font, fill=255)
             
-            # Reset the display flag after showing
-            email_sent_display = False
-            time.sleep(1.5)
+            oled.image(image)
+            oled.show()
         
-        except Exception as e:
-            print(f"Unexpected error in OLED display: {e}")
-            time.sleep(1)
+        time.sleep(1.5)
 
-# Graceful exit function for handling shutdown signals
+# Graceful exit for systemd service
 def cleanup_and_exit(signum, frame):
-    global running
+    global running, cleaned_up
+    if cleaned_up:  # If already cleaned up, return immediately
+        return
+    cleaned_up = True  # Set flag to indicate cleanup is done
     running = False
-    GPIO.output(GREEN_LED, GPIO.LOW)
-    GPIO.output(YELLOW_LED, GPIO.LOW)
-    GPIO.output(RED_LED, GPIO.LOW)
-    GPIO.output(BUZZER_PIN, GPIO.LOW)
-    GPIO.cleanup()
-    print("Exiting gracefully...")
+    print("Stop Measuring")  # Print statement for KeyboardInterrupt
+    try:
+        GPIO.output(green_led, GPIO.LOW)
+        GPIO.output(yellow_led, GPIO.LOW)
+        GPIO.output(red_led, GPIO.LOW)
+        GPIO.output(buzzer_pin, GPIO.LOW)
+        GPIO.cleanup()
+    except RuntimeError:
+        pass
     sys.exit(0)
 
-# Main function
+# Main function to start monitoring and display threads
 if __name__ == "__main__":
+    # Register signal handlers for graceful exit
     signal.signal(signal.SIGTERM, cleanup_and_exit)
     signal.signal(signal.SIGINT, cleanup_and_exit)
-
+    
     try:
         heart_rate_thread = threading.Thread(target=monitor_heart_rate)
-        gsr_thread = threading.Thread(target=monitor_gsr)
         temperature_thread = threading.Thread(target=monitor_temperature)
+        gsr_thread = threading.Thread(target=monitor_gsr)
         display_thread = threading.Thread(target=update_display)
-
+        
         heart_rate_thread.start()
-        gsr_thread.start()
         temperature_thread.start()
+        gsr_thread.start()
         display_thread.start()
 
         heart_rate_thread.join()
-        gsr_thread.join()
         temperature_thread.join()
+        gsr_thread.join()
         display_thread.join()
 
     except KeyboardInterrupt:
-        print("Monitoring stopped.")
         cleanup_and_exit(None, None)
-    
-    sys.exit(0)
-    
-    
