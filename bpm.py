@@ -48,10 +48,6 @@ gsr_human_threshold = 13000  # Adjust based on your observations
 data_lock = threading.Lock()
 running = True
 
-# BPM thresholds for status levels
-normal_bpm_range = (60, 100)
-warning_bpm_range = (50, 120)
-
 # Function to set LED and buzzer based on status
 def set_leds_and_buzzer(status):
     GPIO.output(green_led, GPIO.HIGH if status == "Normal" else GPIO.LOW)
