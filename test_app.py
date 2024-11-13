@@ -83,6 +83,7 @@ high_threshold = 2.5
 low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
+bpm_history = []  # For storing recent BPM values for graphing
 
 # BPM thresholds for status levels
 normal_bpm_range = (60, 100)
