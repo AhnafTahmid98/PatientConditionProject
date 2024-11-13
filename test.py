@@ -261,9 +261,15 @@ def update_display():
 def cleanup_and_exit(signum, frame):
     global running
     running = False
-    GPIO.setmode(GPIO.BCM)  # Set pin numbering mode here to avoid runtime error
-    set_leds_and_buzzer("Normal", False)  # Turn off all LEDs and buzzer on exit
-    GPIO.cleanup()
+    GPIO.setmode(GPIO.BCM)  # Set pin numbering mode if needed
+    
+    # Only turn off LEDs and buzzer without full cleanup
+    GPIO.output(GREEN_LED, GPIO.LOW)
+    GPIO.output(YELLOW_LED, GPIO.LOW)
+    GPIO.output(RED_LED, GPIO.LOW)
+    GPIO.output(BUZZER_PIN, GPIO.LOW)
+    
+    print("Exiting gracefully.")
     sys.exit(0)
 
 # Main function
