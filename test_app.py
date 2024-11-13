@@ -82,7 +82,6 @@ high_threshold = 2.5
 low_threshold = 1.5
 last_pulse_time = 0
 first_pulse = True
-bpm_history = []  # For storing recent BPM values for graphing
 
 # BPM thresholds for status levels
 normal_bpm_range = (60, 100)
@@ -205,12 +204,7 @@ def monitor_heart_rate():
                 pulse_interval = (current_time - last_pulse_time) * 1000  # Convert to milliseconds
                 bpm_value = 60000 / pulse_interval
                 last_pulse_time = current_time
-
-                bpm_history.append(bpm_value)
-                if len(bpm_history) > 20:
-                    bpm_history.pop(0)
                 print(f"Heart Rate: {bpm_value:.2f} BPM")
-                
                 update_status()
             time.sleep(0.1)
         except OSError:
@@ -267,7 +261,7 @@ def determine_stress_level(gsr_value):
     if gsr_value < 13000:
         human_interaction = True
         if gsr_value < RELAXED_THRESHOLD:
-            return "Normal"
+            return "Relexed"
         elif gsr_value < NORMAL_THRESHOLD:
             return "Normal"
         elif gsr_value < ELEVATED_THRESHOLD:
@@ -351,6 +345,10 @@ if __name__ == "__main__":
         temperature_thread = threading.Thread(target=monitor_temperature)
         display_thread = threading.Thread(target=update_display)
 
+        # Wait until 'running' is True before starting threads
+        while not running:
+            time.sleep(0.1)
+            
         # Start threads
         heart_rate_thread.start()
         temperature_thread.start()
