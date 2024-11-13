@@ -59,7 +59,10 @@ baseline_value = 11000
 relaxed_threshold = baseline_value * 0.9
 normal_threshold = baseline_value * 1.1
 elevated_threshold = baseline_value * 1.3
-GSR_AVERAGE_COUNT = 5  # Number of GSR readings to average for interaction check
+GSR_AVERAGE_COUNT = 10  # Number of GSR readings to average for interaction check
+
+# Flag to check if cleanup has already been done
+cleaned_up = False
 
 # Lock for synchronizing data access
 data_lock = threading.Lock()
@@ -134,11 +137,17 @@ def monitor_heart_rate():
                     bpm_history.append(bpm_value)
                     if len(bpm_history) > 20:  # Limit history length
                         bpm_history.pop(0)
+                    print(f"Heart Rate: {bpm_value:.2f} BPM")
+                # Update status based on new BPM value
                 update_status()
             time.sleep(0.1)
         except OSError:
             print("Heart Rate error, reinitializing...")
             time.sleep(1)
+
+# Function to dynamically adjust temperature threshold based on ambient temperature
+def get_dynamic_threshold(ambient_temp, offset=HUMAN_TEMP_THRESHOLD_OFFSET):
+    return ambient_temp + offset
 
 # Function to get stable temperature reading
 def get_stable_temperature(sensor, readings=20):
@@ -148,6 +157,7 @@ def get_stable_temperature(sensor, readings=20):
         time.sleep(0.02)
     return temp_sum / readings
 
+# Temperature monitoring function
 def monitor_temperature():
     global temperature_value, status, HUMAN_TEMP_THRESHOLD_OFFSET
     no_detection_count = 0
@@ -160,19 +170,21 @@ def monitor_temperature():
             if HUMAN_TEMP_RANGE[0] <= object_temp <= HUMAN_TEMP_RANGE[1] and object_temp > dynamic_threshold:
                 temperature_value = object_temp
                 print(f"Human Body Temperature: {temperature_value:.2f}°C")
-                
+                # Write temperature to file for external reading
+                with open("/home/pi/PatientConditionProject/temperature_data.txt", "w") as f:
+                    f.write(f"{temperature_value:.3f}")
+
                 # Append temperature value to history for graphing
                 temperature_history.append(temperature_value)
                 if len(temperature_history) > 20:  # Limit the history length
                     temperature_history.pop(0)
                 no_detection_count = 0
-                HUMAN_TEMP_THRESHOLD_OFFSET = 2.5  # Reset offset after detecting human
             else:
                 no_detection_count += 1
                 temperature_value = 0
                 print("No human body detected.")
 
-            if no_detection_count >= MAX_ATTEMPTS and HUMAN_TEMP_THRESHOLD_OFFSET < 5.0:
+            if no_detection_count >= MAX_ATTEMPTS:
                 HUMAN_TEMP_THRESHOLD_OFFSET += 0.1
                 no_detection_count = 0
 
@@ -238,7 +250,10 @@ def update_display():
 
 # Graceful exit for systemd service
 def cleanup_and_exit(signum, frame):
-    global running
+    global running, cleaned_up
+    if cleaned_up:  # If already cleaned up, return immediately
+        return
+    cleaned_up = True  # Set flag to indicate cleanup is done
     running = False
     print("Stop Measuring")  # Print statement for KeyboardInterrupt
     try:
