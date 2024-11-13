@@ -98,6 +98,11 @@ def update_status():
         status = "Warning"
     else:
         status = "Normal"
+
+    # Print the status change only when it is Warning or Critical
+    if status != "Normal":
+        print(f"Status: {status}, BPM: {bpm_value:.2f}, Temperature: {temperature_value:.2f}C, Stress Level: {stress_level}")
+
     set_leds_and_buzzer(status, human_interaction)
 
 # Heart Rate Monitoring
@@ -230,14 +235,13 @@ def cleanup_and_exit(signum, frame):
     global running
     running = False
     try:
-        # Explicitly turn off all LEDs and the buzzer on exit
         GPIO.output(green_led, GPIO.LOW)
         GPIO.output(yellow_led, GPIO.LOW)
         GPIO.output(red_led, GPIO.LOW)
         GPIO.output(buzzer_pin, GPIO.LOW)
-        GPIO.cleanup()  # Clean up GPIO settings
+        GPIO.cleanup()
     except RuntimeError:
-        pass  # Ignore cleanup errors if GPIO was already cleaned up
+        pass
     sys.exit(0)
 
 # Main function to start monitoring and display threads
@@ -263,4 +267,5 @@ if __name__ == "__main__":
         display_thread.join()
 
     except KeyboardInterrupt:
+        print("Stop mesured")
         cleanup_and_exit(None, None)
