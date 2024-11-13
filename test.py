@@ -92,17 +92,22 @@ def set_leds_and_buzzer(status, interaction):
 # Update status based on BPM, GSR, and Temperature using ranges
 def update_status():
     global status
-    if bpm_value < warning_bpm_range[0] or bpm_value > warning_bpm_range[1] or stress_level == "High" or temperature_value > 39:
-        status = "Critical"
-    elif bpm_value < normal_bpm_range[0] or bpm_value > normal_bpm_range[1] or stress_level == "Elevated" or temperature_value > 38.7:
-        status = "Warning"
+    if human_interaction:
+        # Status is "Critical" only if BPM, stress level, or temperature are out of range
+        if bpm_value < warning_bpm_range[0] or bpm_value > warning_bpm_range[1] or stress_level == "High" or temperature_value > 39:
+            status = "Critical"
+        elif bpm_value < normal_bpm_range[0] or bpm_value > normal_bpm_range[1] or stress_level == "Elevated" or temperature_value > 38.7:
+            status = "Warning"
+        else:
+            status = "Normal"
     else:
+        # No human interaction: force "Normal" status
         status = "Normal"
-
-    # Print the status change only when it is Warning or Critical
+    
+    # Print status if it’s "Warning" or "Critical"
     if status != "Normal":
         print(f"Status: {status}, BPM: {bpm_value:.2f}, Temperature: {temperature_value:.2f}C, Stress Level: {stress_level}")
-
+    
     set_leds_and_buzzer(status, human_interaction)
 
 # Heart Rate Monitoring
