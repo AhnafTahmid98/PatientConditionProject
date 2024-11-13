@@ -59,6 +59,7 @@ baseline_value = 11000
 relaxed_threshold = baseline_value * 0.9
 normal_threshold = baseline_value * 1.1
 elevated_threshold = baseline_value * 1.3
+GSR_AVERAGE_COUNT = 5  # Number of GSR readings to average for interaction check
 
 # Lock for synchronizing data access
 data_lock = threading.Lock()
@@ -133,8 +134,6 @@ def monitor_heart_rate():
                     bpm_history.append(bpm_value)
                     if len(bpm_history) > 20:  # Limit history length
                         bpm_history.pop(0)
-                    print(f"Heart Rate: {bpm_value:.2f} BPM")
-                # Update status based on new BPM value
                 update_status()
             time.sleep(0.1)
         except OSError:
@@ -203,13 +202,15 @@ def read_gsr():
     return chan_gsr.value
 
 def monitor_gsr():
-    global stress_level
+    global stress_level, human_interaction
     while running:
         try:
-            gsr_value = read_gsr()
-            stress_level = determine_stress_level(gsr_value)
+            # Average multiple GSR readings to confirm interaction
+            gsr_readings = [read_gsr() for _ in range(GSR_AVERAGE_COUNT)]
+            avg_gsr = sum(gsr_readings) / GSR_AVERAGE_COUNT
+            stress_level = determine_stress_level(avg_gsr)
             with data_lock:
-                print(f"GSR Value: {gsr_value}, Stress Level: {stress_level}, Interaction: {human_interaction}")
+                print(f"GSR Avg: {avg_gsr:.2f}, Stress Level: {stress_level}, Interaction: {human_interaction}")
             time.sleep(3)
         except OSError:
             print("GSR error, reinitializing...")
@@ -239,6 +240,7 @@ def update_display():
 def cleanup_and_exit(signum, frame):
     global running
     running = False
+    print("Stop Measuring")  # Print statement for KeyboardInterrupt
     try:
         GPIO.output(green_led, GPIO.LOW)
         GPIO.output(yellow_led, GPIO.LOW)
@@ -272,5 +274,4 @@ if __name__ == "__main__":
         display_thread.join()
 
     except KeyboardInterrupt:
-        print("Stop mesured")
         cleanup_and_exit(None, None)
