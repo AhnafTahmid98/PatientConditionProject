@@ -51,6 +51,8 @@ oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
 bpm_value, temperature_value, stress_level = 0, 0, "None"
 bpm_history, temperature_history = [], []
 human_interaction, status, running = False, "Normal", True
+# Add a flag to indicate if cleanup has already been done
+cleanup_done = False
 data_lock = threading.Lock()
 
 # Sensor thresholds
@@ -259,16 +261,21 @@ def update_display():
 
 # Graceful exit function
 def cleanup_and_exit(signum, frame):
-    global running
+    global running, cleanup_done
+
+    if cleanup_done:
+        return  # Prevent multiple executions of cleanup
+
+    cleanup_done = True
     running = False
-    GPIO.setmode(GPIO.BCM)  # Set pin numbering mode if needed
+    GPIO.setmode(GPIO.BCM)
 
     # Turn off LEDs and buzzer
     GPIO.output(GREEN_LED, GPIO.LOW)
     GPIO.output(YELLOW_LED, GPIO.LOW)
     GPIO.output(RED_LED, GPIO.LOW)
     GPIO.output(BUZZER_PIN, GPIO.LOW)
-    
+
     print("Exiting gracefully.")
     time.sleep(1)  # Small delay to ensure threads exit
 
@@ -296,3 +303,6 @@ if __name__ == "__main__":
 
     except KeyboardInterrupt:
         cleanup_and_exit(None, None)
+
+    finally:
+        os._exit(0)  # Forcefully terminate to ensure complete exit
