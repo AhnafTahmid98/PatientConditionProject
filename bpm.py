@@ -41,7 +41,7 @@ last_pulse_time = 0
 first_pulse = True
 
 # Threshold for human interaction with BPM sensor
-human_interaction_threshold = 0.8  # Adjust this based on observations
+human_interaction_threshold = 1  # Adjust this based on observations
 
 # Lock for synchronizing data access
 data_lock = threading.Lock()
