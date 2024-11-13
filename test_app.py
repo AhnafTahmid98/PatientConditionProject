@@ -327,6 +327,7 @@ def update_display():
 def cleanup_and_exit(signum, frame):
     global running
     running = False
+    GPIO.setmode(GPIO.BCM)  # Ensure GPIO mode is set before cleanup
     set_leds_and_buzzer("Normal", False)  # Turn off all LEDs and buzzer on exit
     GPIO.cleanup()
     sys.exit(0)
