@@ -10,6 +10,7 @@ import adafruit_mlx90614
 import adafruit_ssd1306
 from PIL import Image, ImageDraw, ImageFont
 import RPi.GPIO as GPIO
+from send_mail import send_email
 
 # LED and buzzer pin definitions
 green_led = 17  # GPIO 17
@@ -29,6 +30,13 @@ i2c = busio.I2C(board.SCL, board.SDA)
 adc = ADS1115(i2c, address=0x48)
 mlx = adafruit_mlx90614.MLX90614(i2c, address=0x5a)
 oled = adafruit_ssd1306.SSD1306_I2C(128, 32, i2c, addr=0x3c)
+
+# Email tracking counters
+email_sent_count = 0
+MAX_EMAILS = 3
+bpm_warning_count = 0
+temp_warning_count = 0
+stress_warning_count = 0
 
 # Shared variables
 bpm_value = 0
@@ -68,6 +76,53 @@ cleaned_up = False
 data_lock = threading.Lock()
 running = True
 
+# Function to check conditions and send an email
+def check_and_send_email():
+    global email_sent_count, bpm_warning_count, temp_warning_count, stress_warning_count
+
+    if email_sent_count < MAX_EMAILS:
+        subject = "Health Monitoring Alert"
+        details = []
+
+        # Add specific messages for each out-of-range parameter
+        if bpm_warning_count >= 5:
+            details.append("BPM is out of range.")
+        if temp_warning_count >= 5:
+            details.append("Temperature is out of range.")
+        if stress_warning_count >= 5:
+            details.append("Stress Level is critical.")
+
+        # Create a combined details message
+        if len(details) == 1:
+            detailed_message = details[0]
+        elif len(details) == 2:
+            detailed_message = f"Both {details[0][:-1]} and {details[1].lower()}"
+        else:
+            detailed_message = f"All parameters: {', '.join(details)}"
+
+        body = (
+            f"Health Alert!\n\n"
+            f"Status: {status}\n"
+            f"BPM: {bpm_value:.2f}\n"
+            f"Temperature: {temperature_value:.2f}°C\n"
+            f"Stress Level: {stress_level}\n\n"
+            f"Details: {detailed_message}\n\n"
+            f"Please take immediate action."
+        )
+
+        # Send email using send_email function
+        send_email(subject, body)
+        email_sent_count += 1
+        print(f"Email sent! Total emails sent: {email_sent_count}")
+
+        # Reset relevant counters to avoid duplicate emails for the same condition
+        if bpm_warning_count >= 5:
+            bpm_warning_count = 0
+        if temp_warning_count >= 5:
+            temp_warning_count = 0
+        if stress_warning_count >= 5:
+            stress_warning_count = 0
+            
 # Function to control LEDs and buzzer based on status and interaction status
 def set_leds_and_buzzer(status, interaction):
     if interaction:  # Only trigger LEDs and buzzer if human interaction is detected

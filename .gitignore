@@ -1,1 +1,117 @@
+# -----------------
+# General Ignored Files
+# -----------------
+# Log and temporary files
+*.log
+*.tmp
+*.out
+*.err
+
+# macOS system files
 .DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+
+# -----------------
+# Python (Raspberry Pi)
+# -----------------
+# Python cache files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+env/
+venv/
+.venv/
+*.venv/
+
+# Build and distribution
+build/
+dist/
+*.egg-info
+
+# -----------------
+# Sensitive Files
+# -----------------
+# Environment variables
+.env
+.env.*
+.env.local
+
+# Raspberry Pi-specific configurations
+config.yaml
+config_backup.yaml
+
+# Keys and certificates
+*.pem
+*.key
+*.cert
+
+# -----------------
+# Editor and IDE-Specific Files
+# -----------------
+# IntelliJ IDEA / Android Studio
+*.iml
+.idea/
+*.ipr
+*.iws
+
+# Visual Studio Code
+.vscode/
+
+# Vim/Swap files
+*.swp
+*.swo
+
+# -----------------
+# Build and Deployment Files
+# -----------------
+# Build directories and files
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.dart_tool/
+.packages
+
+# Node.js (if used in any frontend app)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -----------------
+# Flutter (if used in a subdirectory)
+# -----------------
+android/
+ios/
+flutter_build/
+*.apk
+*.app
+
+# -----------------
+# System-Specific Files
+# -----------------
+# Temporary backups
+*.bak
+*.old
+*.orig
+
+# Lock files
+*.lock
+
+# Debugging and profiling
+*.hprof
+
+# -----------------
+# Machine Learning and Data Files (if used)
+# -----------------
+# Model weights and datasets
+*.h5
+*.pkl
+*.csv
+*.dat
+*.npy
