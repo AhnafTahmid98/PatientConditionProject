@@ -116,11 +116,11 @@ def check_and_send_email():
         print(f"Email sent! Total emails sent: {email_sent_count}")
 
         # Reset relevant counters to avoid duplicate emails for the same condition
-        if bpm_warning_count >= 5:
+        if bpm_warning_count >= 3:
             bpm_warning_count = 0
-        if temp_warning_count >= 5:
+        if temp_warning_count >= 3:
             temp_warning_count = 0
-        if stress_warning_count >= 5:
+        if stress_warning_count >= 3:
             stress_warning_count = 0
             
 # Function to control LEDs and buzzer based on status and interaction status
@@ -161,7 +161,7 @@ def update_status():
             status = "Normal"
     else:
         # No human interaction: force "Normal" status
-        status = "Normal"
+        status = "No Human Interaction"
     
     # Print status if it’s "Warning" or "Critical"
     if status != "Normal":
