@@ -106,11 +106,11 @@ def send_email(subject, body):
             server.send_message(msg)  # Send the email
 
         print(f"Email sent successfully to {RECIPIENT_EMAIL}.")
-        """
+        
         # Log email event for debugging
         with open("/home/pi/PatientConditionProject/email_log.txt", "a") as log:
             log.write(f"Email sent at {time.ctime()} - Subject: {subject}\n")
-        """
+        
         # Update the email sent flag
         with open("/home/pi/PatientConditionProject/email_sent_flag.txt", "w") as flag_file:
             flag_file.write("1")  # Write "1" to indicate an email was sent
