@@ -53,6 +53,18 @@ async def send_data(websocket, active_page):
                     "Temperature": round(last_temperature_value, 3),
                     "Stress": last_stress_level
                 }
+                # Check for email sent flag
+                try:
+                    with open("/home/pi/PatientConditionProject/email_sent_flag.txt", "r") as email_flag:
+                        flag = email_flag.read().strip()
+                        if flag == "1":
+                            # Notify the WebSocket client that an email was sent
+                            data["EmailAlert"] = "An alert email was sent"
+                            # Reset the flag
+                            with open("/home/pi/PatientConditionProject/email_sent_flag.txt", "w") as reset_flag:
+                                reset_flag.write("0")
+                except FileNotFoundError:
+                    pass  # If the flag file doesn't exist, continue without notification
             else:
                 data = {}  # No data if there's no active monitoring page
 
