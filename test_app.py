@@ -127,11 +127,11 @@ def check_and_send_email():
         details = []
 
         # Add specific messages for each out-of-range parameter
-        if bpm_warning_count >= 5:
+        if bpm_warning_count >= 2:
             details.append("BPM is out of range.")
-        if temp_warning_count >= 5:
+        if temp_warning_count >= 2:
             details.append("Temperature is out of range.")
-        if stress_warning_count >= 5:
+        if stress_warning_count >= 2:
             details.append("Stress Level is critical.")
 
         # Create a combined details message
