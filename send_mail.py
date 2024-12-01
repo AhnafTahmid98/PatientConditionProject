@@ -10,9 +10,9 @@ load_dotenv()
 # Retrieve email credentials and server configuration from environment variables
 SMTP_SERVER = os.getenv("SMTP_SERVER")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))  # Default SMTP port is 587
-EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
+EMAIL_ADDRESS = os.getenv("EMAIL_USER")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
-RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
+RECIPIENT_EMAIL = os.getenv("TO_EMAIL")
 
 
 def send_email(subject, body):

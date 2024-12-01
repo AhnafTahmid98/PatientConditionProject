@@ -192,9 +192,26 @@ def set_leds_and_buzzer(status, interaction):
 
 # Update status based on BPM, GSR, and Temperature using ranges
 def update_status():
-    global status
+    global status, bpm_warning_count, temp_warning_count, stress_warning_count
+
     if human_interaction:
-        # Status is "Critical" only if BPM, stress level, or temperature are out of range
+        # Check and update status based on thresholds
+        if bpm_value < warning_bpm_range[0] or bpm_value > warning_bpm_range[1]:
+            bpm_warning_count += 1
+        else:
+            bpm_warning_count = 0  # Reset if back to normal
+
+        if temperature_value > 39:
+            temp_warning_count += 1
+        else:
+            temp_warning_count = 0  # Reset if back to normal
+
+        if stress_level == "High":
+            stress_warning_count += 1
+        else:
+            stress_warning_count = 0  # Reset if back to normal
+
+        # Set overall status
         if bpm_value < warning_bpm_range[0] or bpm_value > warning_bpm_range[1] or stress_level == "High" or temperature_value > 39:
             status = "Critical"
         elif bpm_value < normal_bpm_range[0] or bpm_value > normal_bpm_range[1] or stress_level == "Elevated" or temperature_value > 38.7:
@@ -202,14 +219,19 @@ def update_status():
         else:
             status = "Normal"
     else:
-        # No human interaction: force "Normal" status
-        status = "No Human Interaction"
+        status = "No Human Interaction"  # No interaction means no critical status
     
-    # Print status if it’s "Warning" or "Critical"
+    # Print status if it's "Warning" or "Critical"
     if status != "Normal":
         print(f"Status: {status}, BPM: {bpm_value:.2f}, Temperature: {temperature_value:.2f}C, Stress Level: {stress_level}")
     
+    # Trigger LEDs and buzzer
     set_leds_and_buzzer(status, human_interaction)
+
+    # Check if email needs to be sent
+    if status in ["Warning", "Critical"]:
+        check_and_send_email()
+
 
 # Heart Rate Monitoring
 def monitor_heart_rate():
