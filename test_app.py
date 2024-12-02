@@ -177,7 +177,6 @@ def set_leds_and_buzzer(status, interaction):
             GPIO.output(green_led, GPIO.LOW)
             GPIO.output(yellow_led, GPIO.HIGH)
             GPIO.output(red_led, GPIO.LOW)
-            GPIO.output(buzzer_pin, GPIO.LOW)
         elif status == "Critical":
             GPIO.output(green_led, GPIO.LOW)
             GPIO.output(yellow_led, GPIO.LOW)
